@@ -35,3 +35,6 @@
 
 # Do NOT ignore the example template file
 !.env.example
+
+/app/assets/builds/*
+!/app/assets/builds/.keep
