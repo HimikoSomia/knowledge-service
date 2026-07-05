@@ -68,3 +68,5 @@ group :test do
 end
 
 gem "tailwindcss-rails", "~> 4.6"
+
+gem "neighbor", "~> 1.2"
