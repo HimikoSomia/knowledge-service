@@ -1,0 +1,21 @@
+<header class="navbar min-h-16 border-b border-base-300 bg-base-100 px-6">
+  <div class="flex-1">
+    <h1 class="text-base font-semibold text-base-content"><%= content_for(:title) || "Dashboard" %></h1>
+  </div>
+
+  <nav class="flex items-center gap-2">
+    <div class="dropdown dropdown-end">
+      <button type="button" tabindex="0" class="btn btn-ghost btn-circle avatar avatar-placeholder">
+        <div class="bg-neutral text-neutral-content w-16 rounded-full">
+          <span>T</span>
+        </div>
+      </button>
+
+      <ul tabindex="0" class="menu dropdown-content z-10 mt-3 w-48 rounded-box border border-base-300 bg-base-100 p-2 shadow">
+        <li><a>Profile</a></li>
+        <li><a>Account settings</a></li>
+        <li><%= link_to "Sign out", session_path, data: { turbo_method: :delete } %></li>
+      </ul>
+    </div>
+  </nav>
+</header>

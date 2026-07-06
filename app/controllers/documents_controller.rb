@@ -1,5 +1,5 @@
 class DocumentsController < ApplicationController
-  before_action :set_document, only: [:show, :edit, :update, :destroy]
+  before_action :set_document, only: [ :show, :edit, :update, :destroy ]
 
   def index
     @documents = Document.all
@@ -44,6 +44,6 @@ class DocumentsController < ApplicationController
   end
 
   def document_params
-    params.expect(document: [:title, :document_type])
+    params.expect(document: [ :title, :document_type ])
   end
 end

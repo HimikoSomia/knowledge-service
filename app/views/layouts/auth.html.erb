@@ -24,14 +24,8 @@
   </head>
 
   <body>
-    <main class="flex">
-      <aside class="w-56 shrink-0">
-        <%= render "layouts/menu" %>
-      </aside>
-      <main class="flex-1">
-        <%= render "layouts/navbar" %>  
-        <%= yield %>
-      </main>
+    <main class="container mx-auto mt-28 px-5 flex">
+      <%= yield %>
     </main>
   </body>
 </html>

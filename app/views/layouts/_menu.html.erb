@@ -1,0 +1,24 @@
+<nav class="flex min-h-screen w-56 flex-col border-r border-base-300 bg-base-200">
+  <div class="flex items-center gap-3 px-4 py-5">
+    <%= link_to root_path, class: "flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-lg font-bold text-primary-content" do %>
+      KS
+    <% end %>
+
+    <div class="min-w-0">
+      <%= link_to "Knowledge", root_path, class: "block truncate text-sm font-semibold text-base-content" %>
+      <p class="truncate text-xs text-base-content/60">Service</p>
+    </div>
+  </div>
+
+  <ul class="menu flex px-3 py-2">
+    <li>
+      <%= link_to "Workspaces", workspaces_path, class: ("active" if controller_name == "workspaces") %>
+    </li>
+    <li>
+      <%= link_to "Documents", documents_path, class: ("active" if controller_name == "documents") %>
+    </li>
+    <li>
+      <%= link_to "Settings", "#", class: "text-base-content/70" %>
+    </li>
+  </ul>
+</nav>

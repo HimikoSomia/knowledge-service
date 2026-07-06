@@ -17,7 +17,7 @@ class CreateDocuments < ActiveRecord::Migration[8.1]
       t.timestamps
     end
 
-    add_index :documents, [:status, :created_at]
-    add_index :document_workspaces, [:workspace_id, :document_id], unique: true
+    add_index :documents, [ :status, :created_at ]
+    add_index :document_workspaces, [ :workspace_id, :document_id ], unique: true
   end
 end

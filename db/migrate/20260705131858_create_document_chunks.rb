@@ -19,6 +19,6 @@ class CreateDocumentChunks < ActiveRecord::Migration[8.1]
       t.timestamps
     end
 
-    add_index :document_chunks, [:document_id, :chunk_index], unique: true
+    add_index :document_chunks, [ :document_id, :chunk_index ], unique: true
   end
 end
