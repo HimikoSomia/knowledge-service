@@ -70,3 +70,5 @@ end
 gem "tailwindcss-rails", "~> 4.6"
 
 gem "neighbor", "~> 1.2"
+
+gem "aws-sdk-s3", "~> 1.226"
