@@ -2,18 +2,18 @@ class WorkspacesController < ApplicationController
   before_action :set_workspace, only: [ :show, :edit, :update, :destroy ]
 
   def index
-    @workspaces = Workspace.all
+    @workspaces = Current.user.workspaces
   end
 
   def show
   end
 
   def new
-    @workspace = Workspace.new
+    @workspace = Current.user.workspaces.new
   end
 
   def create
-    @workspace = Workspace.new(workspace_params)
+    @workspace = Current.user.workspaces.new(workspace_params)
     if @workspace.save
       redirect_to @workspace
     else
@@ -40,10 +40,14 @@ class WorkspacesController < ApplicationController
   private
 
   def set_workspace
-    @workspace = Workspace.find(params[:id])
+    @workspace = Current.user.workspaces.find(params[:id])
+  end
+
+  def workspace_service
+    @workspace_service ||= WorkspaceService.new(Current.user)
   end
 
   def workspace_params
-    params.expect(workspace: [ :name, :description ])
+    params.require(:workspace).permit(:name, :description)
   end
 end

@@ -1,0 +1,27 @@
+<%= form_with(model: workspace, local: true, html: { class: "flex flex-col gap-4 justify-center" }) do |form| %>
+  <% if workspace.errors.any? %>
+    <div id="error_explanation">
+      <h2><%= pluralize(workspace.errors.count, "error") %> prohibited this workspace from being saved:</h2>
+      <ul>
+        <% workspace.errors.full_messages.each do |message| %>
+          <li><%= message %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div class="field">
+    <%= form.label :name %>
+    <%= form.text_field :name, class: "input", placeholder: "Enter workspace name" %>
+  </div>
+
+  <div class="field">
+    <%= form.label :description %>
+    <%= form.text_area :description, class: "input", placeholder: "Enter workspace description" %>
+  </div>
+
+  <div class="actions">
+    <%= form.submit class: "btn btn-primary" %>
+    <%= link_to "Cancel", workspaces_path, class: "btn btn-neutral" %>
+  </div>
+<% end %>

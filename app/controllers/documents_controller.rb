@@ -2,18 +2,19 @@ class DocumentsController < ApplicationController
   before_action :set_document, only: [ :show, :edit, :update, :destroy ]
 
   def index
-    @documents = Document.all
+    limit = params[:limit] || 10
+    @documents = Current.user.documents.order(created_at: :desc).page(params[:page]).per(limit)
   end
 
   def show
   end
 
   def new
-    @document = Document.new
+    @document = Current.user.documents.new
   end
 
   def create
-    @document = Document.new(document_params)
+    @document = Current.user.documents.new(document_params)
     if @document.save
       redirect_to @document
     else
@@ -40,7 +41,7 @@ class DocumentsController < ApplicationController
   private
 
   def set_document
-    @document = Document.find(params[:id])
+    @document = Current.user.documents.find(params[:id])
   end
 
   def document_params

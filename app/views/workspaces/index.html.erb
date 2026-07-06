@@ -6,25 +6,17 @@
       <tr>
         <th></th>
         <th>Workspace Name</th>
-        <th>Owner</th>
+        <th>Description</th>
       </tr>
     </thead>
     <tbody>
-      <tr>
-        <th>1</th>
-        <td>Marketing Team</td>
-        <td>John Doe</td>
-      </tr>
-      <tr>
-        <th>2</th>
-        <td>Engineering Team</td>
-        <td>Jane Smith</td>
-      </tr>
-      <tr>
-        <th>3</th>
-        <td>Sales Team</td>
-        <td>Michael Johnson</td>
-      </tr>
+      <% @workspaces.each_with_index do |workspace, index| %>
+        <tr>
+          <th><%= index + 1 %></th>
+          <td><%= workspace.name %></td>
+          <td><%= workspace.description %></td>
+        </tr>
+      <% end %>
     </tbody>
   </table>
 </div>
