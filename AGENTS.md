@@ -260,3 +260,52 @@ If no issues are found, say that clearly and mention any meaningful test or runt
 - Summarize what changed, where it changed, what was verified, and any remaining risk.
 - Do not claim tests, migrations, builds, or runtime behavior were verified unless they actually were.
 - Ask a focused question only when a reasonable assumption would be risky; otherwise proceed with the obvious Rails-conventional path.
+
+## Agent Guidelines
+
+These guidelines apply to every AI agent working in this repository, regardless of mode or workflow label, including plan, ask, debug, review, implementation, refactor, and documentation work. A mode may change how much action the agent takes, but it must not bypass safety, Rails architecture, verification, or user-work protection rules.
+
+### Primary Behavior
+
+- Inspect first, then act. Read the relevant Rails files before proposing or editing.
+- Prefer the obvious Rails-conventional path when the request is clear.
+- Ask a focused question only when a reasonable assumption would be risky.
+- For implementation requests, proceed through code changes and verification when feasible; do not stop at a proposal unless the user asks for one.
+
+### Architecture First
+
+Before implementing:
+
+1. Read the surrounding controller, model, view, service, migration, route, and test context as relevant.
+2. Understand ownership and data flow, especially `Current.user` scoping.
+3. Check existing Rails patterns in this app.
+4. Reuse the current structure before adding abstractions, gems, or directories.
+
+### Always-On Rules
+
+- Read before editing. Inspect the relevant Rails layer and tests before making changes.
+- Preserve the existing architecture. Keep request handling in controllers, persistence rules in models, reusable workflows in services, presentation in views/helpers, and schema changes in migrations.
+- Protect user work. Check `git status --short` before significant edits. Do not revert or overwrite unrelated local changes.
+- Keep security-sensitive code conservative. Follow the Configuration And Secrets rules above for `.env`, credentials, cookies, tokens, logs, and uploads.
+- Keep docs truthful. If a feature is a placeholder or partially implemented, say so clearly.
+
+### Change Discipline
+
+- Make narrow, coherent changes. Avoid broad refactors, dependency churn, generated-file noise, or formatting unrelated files unless required by the task.
+- Update related Rails surfaces together. Route changes often require controller, view, model, fixture, and test updates. Schema changes require migrations, model updates, schema output, fixtures, and tests where relevant.
+- Prefer additive migrations. Add new Active Record migrations for schema changes; do not silently mutate older migrations.
+- Keep user-owned data scoped through `Current.user` unless the route is intentionally global.
+
+### Tooling And Verification
+
+- Use repo-native tools: `bin/rails test`, focused Rails tests, `bin/rubocop`, `bin/brakeman`, `bin/bundler-audit`, `bin/rails db:migrate`, `bin/rails tailwindcss:build`, and `bin/ci` when appropriate.
+- Verify before finalizing with the most relevant checks available for the change.
+- If a check cannot be run because of missing services, tools, network, database state, or user approval, report that limitation plainly.
+- Do not claim migrations, tests, asset builds, security checks, or runtime behavior were verified unless they actually were.
+
+### Communication
+
+- Keep responses concise and specific.
+- Summarize what changed, where it changed, what was verified, and any remaining risk.
+- In review mode, lead with findings before summaries.
+- In planning or ask mode, still follow the safety and architecture rules; do not recommend actions that would violate them.
