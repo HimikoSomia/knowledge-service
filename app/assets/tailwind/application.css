@@ -3,3 +3,73 @@
 @source not "./daisyui{,*}.mjs";
 
 @plugin "./daisyui.mjs";
+
+@plugin "./daisyui-theme.mjs" {
+  name: "raglight";
+  default: true;
+  prefersdark: false;
+  color-scheme: light;
+
+  /* Base */
+  --color-base-100: #FAFAF8;
+  --color-base-200: #F3F4F6;
+  --color-base-300: #E5E7EB;
+  --color-base-content: #1F2937;
+
+  /* Main CTA: gold */
+  --color-primary: #D4AF37;
+  --color-primary-content: #1F2937;
+
+  /* Secondary: graphite / metal gray */
+  --color-secondary: #4B5563;
+  --color-secondary-content: #FFFFFF;
+
+  /* Accent: darker antique gold */
+  --color-accent: #B8860B;
+  --color-accent-content: #FFFFFF;
+
+  /* Neutral: sidebar / strong UI blocks */
+  --color-neutral: #374151;
+  --color-neutral-content: #FFFFFF;
+
+  /* Status colors */
+  --color-info: #94A3B8;
+  --color-info-content: #111827;
+
+  --color-success: #10B981;
+  --color-success-content: #FFFFFF;
+
+  --color-warning: #F59E0B;
+  --color-warning-content: #111827;
+
+  --color-error: #EF4444;
+  --color-error-content: #FFFFFF;
+
+  /* Shape */
+  --radius-selector: 0.5rem;
+  --radius-field: 0.375rem;
+  --radius-box: 0.75rem;
+
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+@theme {
+  --color-primary-light: #D3D3D3;
+  --color-primary: #808080;
+  --color-primary-dark: #555555;
+
+  --color-secondary-light: #FFFACD;
+  --color-secondary: #B8860B;
+  --color-secondary-dark: #8B4513;
+
+  --color-info: #C0C0C0;
+  --color-accent: #D4AF37;
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-danger: #EF4444;
+}
