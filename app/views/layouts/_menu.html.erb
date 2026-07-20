@@ -1,24 +1,38 @@
-<nav class="flex min-h-screen w-56 flex-col border-r border-base-300 bg-base-200">
+<nav class="flex h-full flex-col border-r border-base-300 bg-base-100">
   <div class="flex items-center gap-3 px-4 py-5">
-    <%= link_to root_path, class: "flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-lg font-bold text-primary-content" do %>
+    <%= link_to root_path, class: "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary text-lg font-bold text-primary-content shadow-sm" do %>
       KS
     <% end %>
 
-    <div class="min-w-0">
+    <div class="hidden min-w-0 sm:block">
       <%= link_to "Knowledge", root_path, class: "block truncate text-sm font-semibold text-base-content" %>
       <p class="truncate text-xs text-base-content/60">Service</p>
     </div>
   </div>
 
-  <ul class="menu flex px-3 py-2">
+  <ul class="flex flex-1 flex-col gap-1 px-3 py-2">
     <li>
-      <%= link_to "Workspaces", workspaces_path, class: ("active" if controller_name == "workspaces") %>
+      <%= link_to workspaces_path, class: sidebar_link_class("workspaces") do %>
+        <span class="<%= class_names("flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-xs font-semibold", controller_name == "workspaces" ? "bg-primary-content/15" : "bg-base-200") %>">W</span>
+        <span class="hidden truncate sm:block">Workspaces</span>
+      <% end %>
     </li>
     <li>
-      <%= link_to "Documents", documents_path, class: ("active" if controller_name == "documents") %>
+      <%= link_to documents_path, class: sidebar_link_class("documents") do %>
+        <span class="<%= class_names("flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-xs font-semibold", controller_name == "documents" ? "bg-primary-content/15" : "bg-base-200") %>">D</span>
+        <span class="hidden truncate sm:block">Documents</span>
+      <% end %>
     </li>
     <li>
-      <%= link_to "Settings", "#", class: "text-base-content/70" %>
+      <%= link_to "#", class: "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-base-content/50 transition hover:bg-base-200 hover:text-base-content" do %>
+        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-base-200 text-xs font-semibold">S</span>
+        <span class="hidden truncate sm:block">Settings</span>
+      <% end %>
     </li>
   </ul>
+
+  <div class="hidden border-t border-base-300 px-4 py-4 sm:block">
+    <p class="text-xs font-medium uppercase tracking-wide text-base-content/40">Signed in</p>
+    <p class="mt-1 truncate text-sm text-base-content/70"><%= Current.user&.email_address %></p>
+  </div>
 </nav>

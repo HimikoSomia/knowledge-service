@@ -1,9 +1,11 @@
 class DocumentsController < ApplicationController
+  include Pagy::Method
+
   before_action :set_document, only: [ :show, :edit, :update, :destroy ]
 
   def index
     limit = params[:limit] || 10
-    @documents = Current.user.documents.order(created_at: :desc).page(params[:page]).per(limit)
+    @pagy, @documents = pagy(Current.user.documents.includes(:workspaces).order(created_at: :desc), items: limit)
   end
 
   def show

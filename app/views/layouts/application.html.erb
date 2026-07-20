@@ -23,15 +23,17 @@
     <%= javascript_importmap_tags %>
   </head>
 
-  <body>
-    <main class="flex">
-      <aside class="w-56 shrink-0">
+  <body class="min-h-screen bg-base-200 text-base-content">
+    <div class="flex min-h-screen">
+      <aside class="sticky top-0 h-screen w-20 shrink-0 sm:w-64">
         <%= render "layouts/menu" %>
       </aside>
-      <main class="flex-1">
+      <section class="flex min-w-0 flex-1 flex-col">
         <%= render "layouts/navbar" %>  
-        <%= yield %>
-      </main>
-    </main>
+        <main class="flex-1 p-4 sm:p-6 lg:p-8">
+          <%= yield %>
+        </main>
+      </section>
+    </div>
   </body>
 </html>

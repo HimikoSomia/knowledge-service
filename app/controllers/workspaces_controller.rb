@@ -2,7 +2,7 @@ class WorkspacesController < ApplicationController
   before_action :set_workspace, only: [ :show, :edit, :update, :destroy ]
 
   def index
-    @workspaces = Current.user.workspaces
+    @workspaces = Current.user.workspaces.includes(:documents).order(updated_at: :desc)
   end
 
   def show

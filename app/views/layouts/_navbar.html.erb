@@ -1,13 +1,13 @@
-<header class="navbar min-h-16 border-b border-base-300 bg-base-100 px-6">
+<header class="navbar min-h-16 border-b border-base-300 bg-base-100 px-4 sm:px-6">
   <div class="flex-1">
-    <h1 class="text-base font-semibold text-base-content"><%= content_for(:title) || "Dashboard" %></h1>
+    <h1 class="text-base font-semibold text-base-content sm:text-lg"><%= content_for(:title) || "Dashboard" %></h1>
   </div>
 
   <nav class="flex items-center gap-2">
     <div class="dropdown dropdown-end">
       <button type="button" tabindex="0" class="btn btn-ghost btn-circle avatar avatar-placeholder">
-        <div class="bg-neutral text-neutral-content w-16 rounded-full">
-          <span>T</span>
+        <div class="h-10 w-10 rounded-full bg-neutral text-neutral-content">
+          <span><%= Current.user&.email_address.to_s.first&.upcase || "U" %></span>
         </div>
       </button>
 
