@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_28_000001) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_28_000002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -46,6 +46,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_28_000001) do
   create_table "document_chunks", force: :cascade do |t|
     t.integer "chunk_index", null: false
     t.text "content", null: false
+    t.string "content_checksum"
     t.datetime "created_at", null: false
     t.bigint "document_id", null: false
     t.vector "embedding", limit: 1536
@@ -57,6 +58,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_28_000001) do
     t.integer "token_count"
     t.datetime "updated_at", null: false
     t.index ["document_id", "chunk_index"], name: "index_document_chunks_on_document_id_and_chunk_index", unique: true
+    t.index ["document_id", "embedding_model"], name: "index_document_chunks_on_document_id_and_model"
     t.index ["document_id"], name: "index_document_chunks_on_document_id"
   end
 
@@ -75,6 +77,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_28_000001) do
     t.datetime "created_at", null: false
     t.string "document_type"
     t.datetime "embedded_at"
+    t.string "embedding_status", default: "not_started", null: false
     t.datetime "enriched_at"
     t.string "enrichment_status", default: "not_applicable", null: false
     t.text "error_message"

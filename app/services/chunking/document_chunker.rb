@@ -1,3 +1,5 @@
+require "digest"
+
 class Chunking::DocumentChunker
   MAX_CHARS  = 2000
   OVERLAP_CHARS = 100
@@ -19,15 +21,17 @@ class Chunking::DocumentChunker
     now = Time.current
     records = chunks.each_with_index.map do |chunk, index|
       {
-        document_id: @document.id,
-        chunk_index:  index,
-        content:      chunk[:content],
-        page_number:  chunk[:page_number],
-        start_char:   chunk[:start_char],
-        end_char:     chunk[:end_char],
-        metadata:     chunk[:metadata],
-        created_at:   now,
-        updated_at:   now
+        document_id:      @document.id,
+        chunk_index:       index,
+        content:           chunk[:content],
+        content_checksum:  content_checksum(chunk[:content]),
+        token_count:       estimate_tokens(chunk[:content]),
+        page_number:       chunk[:page_number],
+        start_char:        chunk[:start_char],
+        end_char:          chunk[:end_char],
+        metadata:          chunk[:metadata],
+        created_at:        now,
+        updated_at:        now
       }
     end
 
@@ -170,5 +174,19 @@ class Chunking::DocumentChunker
     lines << ("-" * 40) if headers.any?
     rows.each { |row| lines << Array(row).join(" | ") }
     lines.join("\n")
+  end
+
+  # Short (16-char) SHA-256 prefix used to detect content changes for idempotent
+  # re-embedding. Not a security hash — collision probability is negligible for
+  # this use case.
+  def content_checksum(text)
+    Digest::SHA256.hexdigest(text.to_s)[0, 16]
+  end
+
+  # Rough token-count estimate: 1 token ≈ 4 characters for English text.
+  # Used to pre-check token budget and populate the token_count column.
+  # Replace with tiktoken if accurate counts are needed.
+  def estimate_tokens(text)
+    (text.to_s.bytesize / 4.0).ceil
   end
 end

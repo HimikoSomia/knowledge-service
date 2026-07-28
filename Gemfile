@@ -82,3 +82,6 @@ gem "pdf-reader", "~> 2.0"       # Text extraction from native PDFs
 gem "docx", "~> 0.8"             # DOCX paragraph/table parsing
 gem "roo", "~> 2.10"             # XLSX/XLS/CSV/ODS spreadsheet parsing
 gem "rubyzip", "~> 2.3"          # PPTX (ZIP-based XML) parsing; also a roo dependency
+
+# AI / embeddings
+gem "ruby-openai", "~> 7.0"      # OpenAI API client (embeddings)

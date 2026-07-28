@@ -26,17 +26,23 @@ class ProcessDocumentJob < ApplicationJob
 
       # Determine whether any image references need optional AI enrichment.
       has_image_refs = result.sections.any? { |s| s["type"] == "image_ref" }
+      needs_embedding = chunk_count > 0
+
       document.mark_processed!(
         chunk_count,
         checksum,
-        enrichment_status: has_image_refs ? "pending" : "not_applicable"
+        enrichment_status: has_image_refs ? "pending" : "not_applicable",
+        embedding_status:  needs_embedding ? "pending"        : "not_applicable"
       )
 
-      if has_image_refs
-        EnrichDocumentJob.perform_later(document.id)
-        Rails.logger.info "ProcessDocumentJob: document #{document_id} processed — #{chunk_count} chunks, enrichment queued"
-      else
-        Rails.logger.info "ProcessDocumentJob: document #{document_id} processed — #{chunk_count} chunks"
+      EnrichDocumentJob.perform_later(document.id) if has_image_refs
+      EmbedDocumentJob.perform_later(document.id)  if needs_embedding
+
+      Rails.logger.info do
+        parts = [ "ProcessDocumentJob: document #{document_id} processed — #{chunk_count} chunks" ]
+        parts << "enrichment queued" if has_image_refs
+        parts << "embedding queued"  if needs_embedding
+        parts.join(", ")
       end
     end
   rescue ActiveRecord::RecordNotFound

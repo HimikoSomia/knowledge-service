@@ -1,6 +1,7 @@
 class Document < ApplicationRecord
   STATUSES = %w[pending processing processed failed].freeze
   ENRICHMENT_STATUSES = %w[not_applicable pending enriching enriched failed].freeze
+  EMBEDDING_STATUSES  = %w[not_started not_applicable pending embedding embedded failed not_configured].freeze
 
   CONTENT_TYPE_MAP = {
     "text/plain" => "txt",
@@ -54,19 +55,36 @@ class Document < ApplicationRecord
     define_method(:"enrichment_#{s}?") { enrichment_status == s }
   end
 
+  EMBEDDING_STATUSES.each do |s|
+    define_method(:"embedding_#{s}?") { embedding_status == s }
+  end
+
   def mark_processing!
     update_columns(status: "processing", processing_started_at: Time.current)
   end
 
-  def mark_processed!(chunk_count_value, checksum, enrichment_status: "not_applicable")
+  def mark_processed!(chunk_count_value, checksum, enrichment_status: "not_applicable", embedding_status: "not_started")
     update_columns(
       status: "processed",
       processed_at: Time.current,
       chunk_count: chunk_count_value,
       file_checksum: checksum,
       error_message: nil,
-      enrichment_status: enrichment_status
+      enrichment_status: enrichment_status,
+      embedding_status: embedding_status
     )
+  end
+
+  def mark_embedding!
+    update_columns(embedding_status: "embedding")
+  end
+
+  def mark_embedded!
+    update_columns(embedding_status: "embedded", embedded_at: Time.current)
+  end
+
+  def mark_embedding_failed!(message)
+    update_columns(embedding_status: "failed", error_message: message.to_s.truncate(1000))
   end
 
   def mark_enriching!
