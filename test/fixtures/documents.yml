@@ -1,11 +1,23 @@
-# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+pending_doc:
+  title: "Pending Document"
+  document_type: "txt"
+  status: "pending"
+  chunk_count: 0
+  user: one
 
-# This model initially had no columns defined. If you add columns to the
-# model remove the "{}" from the fixture names and add the columns immediately
-# below each fixture, per the syntax in the comments below
-#
-one: {}
-# column: value
-#
-two: {}
-# column: value
+processed_doc:
+  title: "Processed Document"
+  document_type: "pdf"
+  status: "processed"
+  chunk_count: 3
+  processed_at: 2026-07-26 10:00:00
+  file_checksum: "abc123"
+  user: one
+
+failed_doc:
+  title: "Failed Document"
+  document_type: "pdf"
+  status: "failed"
+  chunk_count: 0
+  error_message: "Extraction failed: unreadable file"
+  user: two
