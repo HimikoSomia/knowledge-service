@@ -1,0 +1,102 @@
+<% content_for :title, @document.title %>
+
+<div class="space-y-6">
+  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-base-content"><%= @document.title %></h1>
+      <p class="mt-1 text-sm text-base-content/60">
+        <%= @document.document_type&.upcase.presence || "Unknown type" %>
+        <% if @document.file.attached? %>
+          &middot; <%= number_to_human_size(@document.file.blob.byte_size) %>
+          &middot; <span class="font-mono"><%= @document.file.blob.filename %></span>
+        <% end %>
+      </p>
+    </div>
+    <div class="flex items-center gap-2 self-start">
+      <span class="<%= status_badge_class(@document.status) %>"><%= @document.status %></span>
+      <%= link_to "Edit", edit_document_path(@document), class: "btn btn-ghost btn-sm" %>
+      <%= button_to "Delete", @document, method: :delete,
+            class: "btn btn-ghost btn-sm text-error",
+            data: { confirm: "Delete this document and all its chunks?" } %>
+    </div>
+  </div>
+
+  <%# Processing progress / error %>
+  <% if @document.processing? %>
+    <div class="alert alert-info">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="h-6 w-6 shrink-0 stroke-current">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      <span>Document is currently being processed&hellip;</span>
+    </div>
+  <% elsif @document.failed? %>
+    <div class="alert alert-error">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="h-6 w-6 shrink-0 stroke-current">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      <div>
+        <p class="font-semibold">Processing failed</p>
+        <p class="text-sm"><%= @document.error_message %></p>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Stats row %>
+  <div class="stats stats-horizontal w-full shadow-sm border border-base-300">
+    <div class="stat">
+      <div class="stat-title">Chunks</div>
+      <div class="stat-value text-2xl"><%= number_with_delimiter(@document.chunk_count.to_i) %></div>
+    </div>
+    <div class="stat">
+      <div class="stat-title">Processed</div>
+      <div class="stat-value text-sm font-normal"><%= @document.processed_at ? short_date_time(@document.processed_at) : "—" %></div>
+    </div>
+    <div class="stat">
+      <div class="stat-title">Embedded</div>
+      <div class="stat-value text-sm font-normal"><%= @document.embedded_at ? short_date_time(@document.embedded_at) : "—" %></div>
+    </div>
+    <div class="stat">
+      <div class="stat-title">Workspaces</div>
+      <div class="stat-value text-2xl"><%= @document.workspaces.size %></div>
+    </div>
+  </div>
+
+  <%# Extracted content preview %>
+  <% if @document.extracted_content.present? && @document.extracted_content["raw_text"].present? %>
+    <div class="rounded-lg border border-base-300 bg-base-100">
+      <div class="border-b border-base-300 px-4 py-3">
+        <h2 class="text-sm font-semibold text-base-content">Extracted Text Preview</h2>
+      </div>
+      <div class="p-4">
+        <pre class="whitespace-pre-wrap text-sm text-base-content/80 max-h-64 overflow-y-auto"><%= @document.extracted_content["raw_text"].truncate(2000) %></pre>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Chunks list %>
+  <% if @document.document_chunks.any? %>
+    <div class="rounded-lg border border-base-300 bg-base-100">
+      <div class="border-b border-base-300 px-4 py-3">
+        <h2 class="text-sm font-semibold text-base-content">Chunks (<%= @document.chunk_count %>)</h2>
+      </div>
+      <div class="divide-y divide-base-300">
+        <% @document.document_chunks.order(:chunk_index).limit(20).each do |chunk| %>
+          <div class="px-4 py-3">
+            <div class="flex items-center justify-between text-xs text-base-content/50 mb-1">
+              <span>#<%= chunk.chunk_index + 1 %> &middot; <%= chunk.metadata["type"] %></span>
+              <% if chunk.page_number %>
+                <span>Page <%= chunk.page_number %></span>
+              <% end %>
+            </div>
+            <p class="text-sm text-base-content/80 line-clamp-3"><%= chunk.content %></p>
+          </div>
+        <% end %>
+        <% if @document.chunk_count > 20 %>
+          <div class="px-4 py-3 text-center text-sm text-base-content/50">
+            &hellip; and <%= @document.chunk_count - 20 %> more chunks
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+</div>

@@ -1,7 +1,89 @@
 class Document < ApplicationRecord
+  STATUSES = %w[pending processing processed failed].freeze
+
+  CONTENT_TYPE_MAP = {
+    "text/plain" => "txt",
+    "text/markdown" => "md",
+    "text/csv" => "csv",
+    "application/json" => "json",
+    "text/html" => "html",
+    "application/xhtml+xml" => "html",
+    "application/xml" => "xml",
+    "text/xml" => "xml",
+    "application/pdf" => "pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => "docx",
+    "application/msword" => "doc",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" => "xlsx",
+    "application/vnd.ms-excel" => "xls",
+    "application/vnd.oasis.opendocument.spreadsheet" => "ods",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation" => "pptx",
+    "application/vnd.ms-powerpoint" => "ppt"
+  }.freeze
+
   has_one_attached :file
   belongs_to :user
   has_many :document_workspaces, dependent: :destroy
   has_many :workspaces, through: :document_workspaces
   has_many :document_chunks, dependent: :destroy
+
+  validates :title, presence: true
+  validates :status, inclusion: { in: STATUSES }
+  validate :file_must_be_attached, on: :create
+
+  before_save :detect_document_type
+
+  after_commit :enqueue_processing_job, on: :create
+  after_commit :enqueue_reprocessing_if_file_replaced, on: :update
+
+  STATUSES.each do |s|
+    define_method(:"#{s}?") { status == s }
+  end
+
+  def mark_processing!
+    update_columns(status: "processing", processing_started_at: Time.current)
+  end
+
+  def mark_processed!(chunk_count_value, checksum)
+    update_columns(
+      status: "processed",
+      processed_at: Time.current,
+      chunk_count: chunk_count_value,
+      file_checksum: checksum,
+      error_message: nil
+    )
+  end
+
+  def mark_failed!(message)
+    update_columns(status: "failed", error_message: message.to_s.truncate(1000))
+  end
+
+  def already_processed_for?(checksum)
+    processed? && file_checksum == checksum
+  end
+
+  private
+
+  def detect_document_type
+    return unless file.attached?
+
+    content_type = file.blob.content_type
+    ext = File.extname(file.blob.filename.to_s).delete(".").downcase.presence
+    self.document_type = CONTENT_TYPE_MAP[content_type] || ext || "unknown"
+  end
+
+  def file_must_be_attached
+    errors.add(:file, :blank) unless file.attached?
+  end
+
+  def enqueue_processing_job
+    ProcessDocumentJob.perform_later(id) if file.attached?
+  end
+
+  def enqueue_reprocessing_if_file_replaced
+    return unless file.attached?
+    return unless file_checksum.present?
+    return if file.blob.checksum == file_checksum
+
+    ProcessDocumentJob.perform_later(id)
+  end
 end
