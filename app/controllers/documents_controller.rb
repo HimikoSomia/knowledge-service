@@ -18,9 +18,9 @@ class DocumentsController < ApplicationController
   def create
     @document = Current.user.documents.new(document_params)
     if @document.save
-      redirect_to @document
+      redirect_to @document, notice: "Document uploaded. Processing will begin shortly."
     else
-      render :new
+      render :new, status: :unprocessable_entity
     end
   end
 
@@ -31,7 +31,7 @@ class DocumentsController < ApplicationController
     if @document.update(document_params)
       redirect_to @document
     else
-      render :edit
+      render :edit, status: :unprocessable_entity
     end
   end
 
@@ -47,6 +47,6 @@ class DocumentsController < ApplicationController
   end
 
   def document_params
-    params.expect(document: [ :title, :document_type ])
+    params.expect(document: [ :title, :file ])
   end
 end

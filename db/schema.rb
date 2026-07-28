@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_06_124402) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_27_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -76,7 +76,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_06_124402) do
     t.string "document_type"
     t.datetime "embedded_at"
     t.text "error_message"
+    t.jsonb "extracted_content", default: {}, null: false
+    t.string "file_checksum"
     t.datetime "processed_at"
+    t.datetime "processing_started_at"
     t.string "status", default: "pending", null: false
     t.string "title", null: false
     t.datetime "updated_at", null: false

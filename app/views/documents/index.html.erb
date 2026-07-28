@@ -26,7 +26,7 @@
         </thead>
         <tbody>
           <% @documents.each_with_index do |document, index| %>
-            <tr class="hover">
+            <tr class="hover" clickable-row data-href="<%= document_path(document) %>">
               <th class="text-base-content/50"><%= @pagy.offset + index + 1 %></th>
               <td>
                 <%= link_to document.title, document, class: "font-semibold text-base-content hover:text-primary" %>

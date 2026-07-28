@@ -31,6 +31,11 @@
       <section class="flex min-w-0 flex-1 flex-col">
         <%= render "layouts/navbar" %>  
         <main class="flex-1 p-4 sm:p-6 lg:p-8">
+          <% flash.each do |type, message| %>
+            <div class="alert <%= type.to_s == 'notice' ? 'alert-success' : 'alert-error' %> mb-4">
+              <span><%= message %></span>
+            </div>
+          <% end %>
           <%= yield %>
         </main>
       </section>
