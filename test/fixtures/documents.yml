@@ -3,6 +3,7 @@ pending_doc:
   document_type: "txt"
   status: "pending"
   chunk_count: 0
+  enrichment_status: "not_applicable"
   user: one
 
 processed_doc:
@@ -12,6 +13,7 @@ processed_doc:
   chunk_count: 3
   processed_at: 2026-07-26 10:00:00
   file_checksum: "abc123"
+  enrichment_status: "not_applicable"
   user: one
 
 failed_doc:
@@ -20,4 +22,5 @@ failed_doc:
   status: "failed"
   chunk_count: 0
   error_message: "Extraction failed: unreadable file"
+  enrichment_status: "not_applicable"
   user: two

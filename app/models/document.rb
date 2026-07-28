@@ -1,5 +1,6 @@
 class Document < ApplicationRecord
   STATUSES = %w[pending processing processed failed].freeze
+  ENRICHMENT_STATUSES = %w[not_applicable pending enriching enriched failed].freeze
 
   CONTENT_TYPE_MAP = {
     "text/plain" => "txt",
@@ -17,7 +18,17 @@ class Document < ApplicationRecord
     "application/vnd.ms-excel" => "xls",
     "application/vnd.oasis.opendocument.spreadsheet" => "ods",
     "application/vnd.openxmlformats-officedocument.presentationml.presentation" => "pptx",
-    "application/vnd.ms-powerpoint" => "ppt"
+    "application/vnd.ms-powerpoint" => "ppt",
+    # Image files
+    "image/jpeg"  => "jpeg",
+    "image/jpg"   => "jpeg",
+    "image/png"   => "png",
+    "image/webp"  => "webp",
+    "image/gif"   => "gif",
+    "image/tiff"  => "tiff",
+    "image/bmp"   => "bmp",
+    "image/heic"  => "heic",
+    "image/heif"  => "heif"
   }.freeze
 
   has_one_attached :file
@@ -39,22 +50,39 @@ class Document < ApplicationRecord
     define_method(:"#{s}?") { status == s }
   end
 
+  ENRICHMENT_STATUSES.each do |s|
+    define_method(:"enrichment_#{s}?") { enrichment_status == s }
+  end
+
   def mark_processing!
     update_columns(status: "processing", processing_started_at: Time.current)
   end
 
-  def mark_processed!(chunk_count_value, checksum)
+  def mark_processed!(chunk_count_value, checksum, enrichment_status: "not_applicable")
     update_columns(
       status: "processed",
       processed_at: Time.current,
       chunk_count: chunk_count_value,
       file_checksum: checksum,
-      error_message: nil
+      error_message: nil,
+      enrichment_status: enrichment_status
     )
+  end
+
+  def mark_enriching!
+    update_columns(enrichment_status: "enriching")
+  end
+
+  def mark_enriched!
+    update_columns(enrichment_status: "enriched", enriched_at: Time.current)
   end
 
   def mark_failed!(message)
     update_columns(status: "failed", error_message: message.to_s.truncate(1000))
+  end
+
+  def mark_enrichment_failed!(message)
+    update_columns(enrichment_status: "failed", error_message: message.to_s.truncate(1000))
   end
 
   def already_processed_for?(checksum)

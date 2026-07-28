@@ -13,7 +13,17 @@ class Extraction::DocumentExtractor
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"       => Extraction::XlsxExtractor,
     "application/vnd.ms-excel"                                                 => Extraction::XlsxExtractor,
     "application/vnd.oasis.opendocument.spreadsheet"                           => Extraction::XlsxExtractor,
-    "application/vnd.openxmlformats-officedocument.presentationml.presentation" => Extraction::PptxExtractor
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation" => Extraction::PptxExtractor,
+    # Image files
+    "image/jpeg"  => Extraction::ImageExtractor,
+    "image/jpg"   => Extraction::ImageExtractor,
+    "image/png"   => Extraction::ImageExtractor,
+    "image/webp"  => Extraction::ImageExtractor,
+    "image/gif"   => Extraction::ImageExtractor,
+    "image/tiff"  => Extraction::ImageExtractor,
+    "image/bmp"   => Extraction::ImageExtractor,
+    "image/heic"  => Extraction::ImageExtractor,
+    "image/heif"  => Extraction::ImageExtractor
   }.freeze
 
   EXTENSION_MAP = {
@@ -30,7 +40,18 @@ class Extraction::DocumentExtractor
     "xlsx"     => Extraction::XlsxExtractor,
     "xls"      => Extraction::XlsxExtractor,
     "ods"      => Extraction::XlsxExtractor,
-    "pptx"     => Extraction::PptxExtractor
+    "pptx"     => Extraction::PptxExtractor,
+    # Image files
+    "jpg"      => Extraction::ImageExtractor,
+    "jpeg"     => Extraction::ImageExtractor,
+    "png"      => Extraction::ImageExtractor,
+    "webp"     => Extraction::ImageExtractor,
+    "gif"      => Extraction::ImageExtractor,
+    "tiff"     => Extraction::ImageExtractor,
+    "tif"      => Extraction::ImageExtractor,
+    "bmp"      => Extraction::ImageExtractor,
+    "heic"     => Extraction::ImageExtractor,
+    "heif"     => Extraction::ImageExtractor
   }.freeze
 
   # Returns an extractor instance appropriate for the given Active Storage blob.

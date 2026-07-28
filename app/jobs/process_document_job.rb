@@ -23,9 +23,21 @@ class ProcessDocumentJob < ApplicationJob
       document.update_columns(extracted_content: result.to_h)
 
       chunk_count = Chunking::DocumentChunker.new(document, result).chunk!
-      document.mark_processed!(chunk_count, checksum)
 
-      Rails.logger.info "ProcessDocumentJob: document #{document_id} processed — #{chunk_count} chunks created"
+      # Determine whether any image references need optional AI enrichment.
+      has_image_refs = result.sections.any? { |s| s["type"] == "image_ref" }
+      document.mark_processed!(
+        chunk_count,
+        checksum,
+        enrichment_status: has_image_refs ? "pending" : "not_applicable"
+      )
+
+      if has_image_refs
+        EnrichDocumentJob.perform_later(document.id)
+        Rails.logger.info "ProcessDocumentJob: document #{document_id} processed — #{chunk_count} chunks, enrichment queued"
+      else
+        Rails.logger.info "ProcessDocumentJob: document #{document_id} processed — #{chunk_count} chunks"
+      end
     end
   rescue ActiveRecord::RecordNotFound
     raise

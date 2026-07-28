@@ -93,6 +93,11 @@ class Chunking::DocumentChunker
           metadata:    meta
         }
         char_offset += text.length
+
+      when "image_ref"
+        # image_ref sections without OCR text do not produce chunks in the core pipeline.
+        # They are preserved in extracted_content for optional enrichment by EnrichDocumentJob.
+        next
       end
     end
 
@@ -105,7 +110,7 @@ class Chunking::DocumentChunker
       page_number: section["page_number"],
       start_char:  offset,
       end_char:    offset + text.length,
-      metadata:    { "type" => type, "heading" => heading }.compact
+      metadata:    { "type" => type, "heading" => heading, "source_type" => section["source_type"] }.compact
     }
   end
 
