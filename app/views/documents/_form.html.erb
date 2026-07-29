@@ -1,8 +1,7 @@
-<%= form_with(model: document, local: true, html: { class: "flex flex-col gap-4 justify-center" }) do |form| %>
+<%= form_with(model: document, local: true, html: { class: "flex flex-col gap-4" }) do |form| %>
   <% if document.errors.any? %>
-    <div id="error_explanation">
-      <h2><%= pluralize(document.errors.count, "error") %> prohibited this document from being saved:</h2>
-      <ul>
+    <div class="alert alert-error">
+      <ul class="list-disc list-inside space-y-1 text-sm">
         <% document.errors.full_messages.each do |message| %>
           <li><%= message %></li>
         <% end %>
@@ -10,18 +9,44 @@
     </div>
   <% end %>
 
-  <div class="field">
-    <%= form.label :title %>
-    <%= form.text_field :title, class: "file-input file-input-md", placeholder: "Enter document title" %>
+  <div class="form-control">
+    <%= form.label :title, class: "label label-text font-medium" %>
+    <%= form.text_field :title, class: "input input-bordered w-full", placeholder: "Give this document a meaningful name" %>
+    <span class="label-text-alt text-base-content/50 mt-1">
+      Used for display and identification. The original filename is preserved separately.
+    </span>
   </div>
 
-  <div class="field">
-    <%= form.label :file %>
-    <%= form.file_field :file, class: "input" %>
+  <div class="form-control">
+    <%= form.label :file, class: "label label-text font-medium" %>
+    <%= form.file_field :file, class: "file-input file-input-bordered w-full",
+          accept: "application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,text/csv,application/json,text/html,image/jpeg,image/png,image/webp" %>
+    <span class="label-text-alt text-base-content/50 mt-1">
+      PDF, Word, Excel, PowerPoint, TXT, CSV, JSON, HTML, or images &middot; Max 50 MB
+    </span>
   </div>
 
-  <div class="actions">
-    <%= form.submit class: "btn btn-primary" %>
-    <%= link_to "Cancel", workspaces_path, class: "btn btn-neutral" %>
+  <% if @workspaces.present? %>
+    <div class="form-control">
+      <span class="label label-text font-medium">Add to workspaces <span class="font-normal text-base-content/50">(optional)</span></span>
+      <div class="space-y-1 rounded-lg border border-base-300 bg-base-200/40 p-3 max-h-40 overflow-y-auto">
+        <% @workspaces.each do |workspace| %>
+          <label class="flex cursor-pointer items-center gap-2">
+            <%= check_box_tag "document[workspace_ids][]",
+                  workspace.id,
+                  Array(@selected_workspace_ids).include?(workspace.id),
+                  class: "checkbox checkbox-sm" %>
+            <span class="text-sm"><%= workspace.name %></span>
+          </label>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <div class="flex items-center gap-3 pt-2">
+    <%= form.submit document.new_record? ? "Upload document" : "Save changes",
+          class: "btn btn-primary" %>
+    <% cancel_path = document.new_record? ? documents_path : document_path(document) %>
+    <%= link_to "Cancel", cancel_path, class: "btn btn-ghost" %>
   </div>
 <% end %>

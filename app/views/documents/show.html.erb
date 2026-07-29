@@ -5,15 +5,18 @@
     <div>
       <h1 class="text-2xl font-bold text-base-content"><%= @document.title %></h1>
       <p class="mt-1 text-sm text-base-content/60">
-        <%= @document.document_type&.upcase.presence || "Unknown type" %>
         <% if @document.file.attached? %>
+          <span class="font-mono"><%= @document.file.blob.filename %></span>
+          &middot; <%= @document.document_type&.upcase.presence || "Unknown type" %>
           &middot; <%= number_to_human_size(@document.file.blob.byte_size) %>
-          &middot; <span class="font-mono"><%= @document.file.blob.filename %></span>
+        <% else %>
+          <%= @document.document_type&.upcase.presence || "Unknown type" %>
         <% end %>
       </p>
     </div>
-    <div class="flex items-center gap-2 self-start">
+    <div class="flex items-center gap-2 self-start flex-wrap">
       <span class="<%= status_badge_class(@document.status) %>"><%= @document.status %></span>
+      <%= embedding_status_badge(@document) %>
       <%= link_to "Edit", edit_document_path(@document), class: "btn btn-ghost btn-sm" %>
       <%= button_to "Delete", @document, method: :delete,
             class: "btn btn-ghost btn-sm text-error",
@@ -21,13 +24,20 @@
     </div>
   </div>
 
-  <%# Processing progress / error %>
+  <%# Processing state alerts %>
   <% if @document.processing? %>
     <div class="alert alert-info">
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="h-6 w-6 shrink-0 stroke-current">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
       </svg>
-      <span>Document is currently being processed&hellip;</span>
+      <span>Extracting and processing document content&hellip;</span>
+    </div>
+  <% elsif @document.embedding_embedding? %>
+    <div class="alert alert-info">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="h-6 w-6 shrink-0 stroke-current">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      <span>Generating search embeddings&hellip; The document will be searchable shortly.</span>
     </div>
   <% elsif @document.failed? %>
     <div class="alert alert-error">
@@ -35,7 +45,17 @@
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
       </svg>
       <div>
-        <p class="font-semibold">Processing failed</p>
+        <p class="font-semibold">Extraction failed</p>
+        <p class="text-sm"><%= @document.error_message %></p>
+      </div>
+    </div>
+  <% elsif @document.embedding_failed? %>
+    <div class="alert alert-warning">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="h-6 w-6 shrink-0 stroke-current">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      <div>
+        <p class="font-semibold">Could not generate search embeddings</p>
         <p class="text-sm"><%= @document.error_message %></p>
       </div>
     </div>
@@ -52,7 +72,7 @@
       <div class="stat-value text-sm font-normal"><%= @document.processed_at ? short_date_time(@document.processed_at) : "—" %></div>
     </div>
     <div class="stat">
-      <div class="stat-title">Embedded</div>
+      <div class="stat-title">Searchable since</div>
       <div class="stat-value text-sm font-normal"><%= @document.embedded_at ? short_date_time(@document.embedded_at) : "—" %></div>
     </div>
     <div class="stat">
@@ -83,10 +103,20 @@
         <% @document.document_chunks.order(:chunk_index).limit(20).each do |chunk| %>
           <div class="px-4 py-3">
             <div class="flex items-center justify-between text-xs text-base-content/50 mb-1">
-              <span>#<%= chunk.chunk_index + 1 %> &middot; <%= chunk.metadata["type"] %></span>
-              <% if chunk.page_number %>
-                <span>Page <%= chunk.page_number %></span>
-              <% end %>
+              <span>
+                #<%= chunk.chunk_index + 1 %> &middot; <%= chunk.metadata["type"] %>
+                <% if chunk.metadata["source_type"].present? && chunk.metadata["source_type"] != "text" %>
+                  &middot; <span class="uppercase"><%= chunk.metadata["source_type"].tr("_", " ") %></span>
+                <% end %>
+              </span>
+              <div class="flex items-center gap-2">
+                <% if chunk.page_number %>
+                  <span>Page <%= chunk.page_number %></span>
+                <% end %>
+                <% if chunk.embedding.present? %>
+                  <span class="text-success">&#x2022; embedded</span>
+                <% end %>
+              </div>
             </div>
             <p class="text-sm text-base-content/80 line-clamp-3"><%= chunk.content %></p>
           </div>

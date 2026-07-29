@@ -14,6 +14,10 @@ Rails.application.routes.draw do
   # Defines the root path route ("/")
   # root "posts#index"
   root "workspaces#index"
-  resources :workspaces
+  resources :workspaces do
+    member do
+      get :search
+    end
+  end
   resources :documents
 end

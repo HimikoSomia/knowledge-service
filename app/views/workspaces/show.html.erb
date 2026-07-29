@@ -1,7 +1,119 @@
-<% content_for :title, "Workspace" %>
-<div class="card">
-  <div class="card-body">
-    <h2 class="card-title"><%= @workspace.name %></h2>
-    <p><%= @workspace.description %></p>
+<% content_for :title, @workspace.name %>
+
+<div class="space-y-6">
+  <%# Header %>
+  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-base-content"><%= @workspace.name %></h1>
+      <% if @workspace.description.present? %>
+        <p class="mt-1 text-sm text-base-content/60"><%= @workspace.description %></p>
+      <% end %>
+    </div>
+    <div class="flex items-center gap-2 self-start">
+      <%= link_to "Edit", edit_workspace_path(@workspace), class: "btn btn-ghost btn-sm" %>
+    </div>
+  </div>
+
+  <%# Search form %>
+  <div class="rounded-lg border border-base-300 bg-base-100 p-5">
+    <h2 class="mb-3 text-sm font-semibold text-base-content">Ask a question about your documents</h2>
+    <%= form_with url: search_workspace_path(@workspace), method: :get, local: true, class: "flex gap-2" do |f| %>
+      <%= f.text_field :q,
+            value: @query,
+            placeholder: "e.g. What are the main findings in Q3?",
+            class: "input input-bordered flex-1",
+            autofocus: @search_performed %>
+      <%= f.submit "Search", class: "btn btn-primary" %>
+    <% end %>
+  </div>
+
+  <%# Search error %>
+  <% if @search_error.present? %>
+    <div class="alert alert-warning">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0 stroke-current" fill="none" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+      </svg>
+      <span><%= @search_error %></span>
+    </div>
+  <% end %>
+
+  <%# Search results %>
+  <% if @search_performed %>
+    <div class="space-y-2">
+      <h2 class="text-sm font-semibold text-base-content/70">
+        <% if @results.any? %>
+          Top results for &ldquo;<%= @query %>&rdquo;
+        <% else %>
+          No results found for &ldquo;<%= @query %>&rdquo;
+        <% end %>
+      </h2>
+
+      <% @results.each_with_index do |chunk, idx| %>
+        <div class="rounded-lg border border-base-300 bg-base-100 p-4">
+          <div class="flex items-center justify-between text-xs text-base-content/50 mb-2">
+            <div class="flex items-center gap-3">
+              <span class="font-semibold text-base-content/70">
+                <%= link_to chunk.document.title, document_path(chunk.document), class: "hover:text-primary" %>
+              </span>
+              <% if chunk.page_number %>
+                <span>Page <%= chunk.page_number %></span>
+              <% end %>
+              <% source = chunk.metadata["source_type"] %>
+              <% if source.present? && source != "text" %>
+                <span class="badge badge-xs badge-ghost uppercase"><%= source.tr("_", " ") %></span>
+              <% end %>
+            </div>
+            <span class="tabular-nums">
+              <%= "%.0f%%" % ((1 - chunk.neighbor_distance) * 100) %> match
+            </span>
+          </div>
+          <p class="text-sm text-base-content/80 leading-relaxed"><%= chunk.content %></p>
+        </div>
+      <% end %>
+
+      <% if @results.empty? %>
+        <div class="rounded-lg border border-base-300 bg-base-100 p-8 text-center">
+          <p class="text-base-content/60 text-sm">
+            No embedded documents matched your query. Make sure documents have finished processing.
+          </p>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+
+  <%# Documents in this workspace %>
+  <div class="rounded-lg border border-base-300 bg-base-100">
+    <div class="flex items-center justify-between border-b border-base-300 px-4 py-3">
+      <h2 class="text-sm font-semibold text-base-content">Documents</h2>
+      <span class="badge badge-ghost"><%= @workspace.documents.count %></span>
+    </div>
+
+    <% docs = @workspace.documents.includes(:workspaces).order(updated_at: :desc) %>
+    <% if docs.any? %>
+      <div class="divide-y divide-base-300">
+        <% docs.each do |doc| %>
+          <div class="flex items-center justify-between px-4 py-3">
+            <div class="min-w-0">
+              <%= link_to doc.title, document_path(doc),
+                    class: "text-sm font-medium text-base-content hover:text-primary truncate block" %>
+              <p class="text-xs text-base-content/50 mt-0.5">
+                <%= doc.document_type&.upcase.presence || "Unknown" %>
+                <% if doc.file.attached? %>
+                  &middot; <%= number_to_human_size(doc.file.blob.byte_size) %>
+                <% end %>
+              </p>
+            </div>
+            <div class="flex items-center gap-2 ml-4">
+              <span class="<%= status_badge_class(doc.status) %>"><%= doc.status %></span>
+              <%= embedding_status_badge(doc) %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    <% else %>
+      <div class="px-4 py-8 text-center text-sm text-base-content/60">
+        No documents yet. <%= link_to "Add a document", new_document_path, class: "link link-primary" %> to get started.
+      </div>
+    <% end %>
   </div>
 </div>
