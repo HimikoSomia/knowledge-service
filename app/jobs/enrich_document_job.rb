@@ -12,6 +12,8 @@
 #   - Other errors are retried (via retry_on) before marking enrichment failed.
 #
 class EnrichDocumentJob < ApplicationJob
+  include DocumentProcessingLogging
+
   queue_as :enrichment
 
   discard_on ActiveRecord::RecordNotFound
@@ -61,13 +63,16 @@ class EnrichDocumentJob < ApplicationJob
 
     document.mark_enriched!
     Rails.logger.info "EnrichDocumentJob: document #{document_id} enriched — #{new_chunks.size} new chunks"
+
+    # Re-queue embedding so the new enrichment chunks get their vectors.
+    EmbedDocumentJob.perform_later(document.id) if new_chunks.any?
   rescue NotImplementedError => e
     Rails.logger.warn "EnrichDocumentJob: vision service not implemented for document #{document_id}: #{e.message}"
     document&.update_columns(enrichment_status: "not_applicable")
-    # Do not re-raise — this is expected until the vision service is implemented.
+    # Do not re-raise — expected until the vision service is implemented.
   rescue => e
-    Rails.logger.error "EnrichDocumentJob: enrichment failed for document #{document_id}: #{e.message}"
-    document&.mark_enrichment_failed!(e.message)
+    friendly = log_and_friendly_message(e, context: "document #{document_id} enrichment")
+    document&.mark_enrichment_failed!(friendly)
     raise
   end
 

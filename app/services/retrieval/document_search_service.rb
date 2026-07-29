@@ -50,7 +50,7 @@ class Retrieval::DocumentSearchService
     scope = DocumentChunk
       .joins(:document)
       .where(
-        documents:       { user_id: @user.id, status: "processed" },
+        documents:       { user_id: @user.id, status: "processed", embedding_status: "embedded" },
         document_chunks: { embedding_model: current_model }
       )
       .where.not(document_chunks: { embedding: nil })

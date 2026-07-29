@@ -10,6 +10,8 @@
 #   - Marks the document as embedded only when every chunk has a vector.
 #
 class EmbedDocumentJob < ApplicationJob
+  include DocumentProcessingLogging
+
   queue_as :embedding
 
   discard_on ActiveRecord::RecordNotFound
@@ -72,7 +74,8 @@ class EmbedDocumentJob < ApplicationJob
     document.mark_embedded!
     Rails.logger.info "EmbedDocumentJob: document #{document_id} fully embedded (#{document.chunk_count} chunks)"
   rescue => e
-    document&.mark_embedding_failed!(e.message)
+    friendly = log_and_friendly_message(e, context: "document #{document_id} embedding")
+    document&.mark_embedding_failed!(friendly)
     raise
   end
 

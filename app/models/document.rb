@@ -3,6 +3,9 @@ class Document < ApplicationRecord
   ENRICHMENT_STATUSES = %w[not_applicable pending enriching enriched failed].freeze
   EMBEDDING_STATUSES  = %w[not_started not_applicable pending embedding embedded failed not_configured].freeze
 
+  # 50 MB maximum upload size.
+  MAX_FILE_SIZE = 50.megabytes
+
   CONTENT_TYPE_MAP = {
     "text/plain" => "txt",
     "text/markdown" => "md",
@@ -41,6 +44,8 @@ class Document < ApplicationRecord
   validates :title, presence: true
   validates :status, inclusion: { in: STATUSES }
   validate :file_must_be_attached, on: :create
+  validate :file_content_type_supported, if: -> { file.attached? }
+  validate :file_size_within_limit,      if: -> { file.attached? }
 
   before_save :detect_document_type
 
@@ -121,14 +126,46 @@ class Document < ApplicationRecord
     errors.add(:file, :blank) unless file.attached?
   end
 
+  def file_content_type_supported
+    ct  = file.blob.content_type.to_s
+    ext = File.extname(file.blob.filename.to_s).delete(".").downcase
+
+    return if CONTENT_TYPE_MAP.key?(ct)
+    return if Extraction::DocumentExtractor::EXTENSION_MAP.key?(ext)
+
+    errors.add(
+      :file,
+      "type \u201c#{ct}\u201d is not supported. " \
+      "Please upload a PDF, Word document, spreadsheet, presentation, text file, or image."
+    )
+  end
+
+  def file_size_within_limit
+    return if file.blob.byte_size <= MAX_FILE_SIZE
+
+    max_mb = (MAX_FILE_SIZE / 1.megabyte).to_i
+    errors.add(:file, "is too large. The maximum allowed size is #{max_mb} MB.")
+  end
+
   def enqueue_processing_job
     ProcessDocumentJob.perform_later(id) if file.attached?
   end
 
   def enqueue_reprocessing_if_file_replaced
     return unless file.attached?
-    return unless file_checksum.present?
-    return if file.blob.checksum == file_checksum
+
+    new_checksum = file.blob.checksum
+
+    if file_checksum.blank?
+      # file_checksum is nil for brand-new documents — ProcessDocumentJob was already
+      # enqueued via after_commit on: :create, so don't double-enqueue.
+      # Exception: if the document previously failed, the user may be retrying
+      # by re-uploading the file without changing it.
+      return unless failed?
+    else
+      # Skip when the file hasn't actually changed.
+      return if file_checksum == new_checksum
+    end
 
     ProcessDocumentJob.perform_later(id)
   end

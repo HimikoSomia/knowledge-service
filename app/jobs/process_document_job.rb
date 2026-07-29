@@ -1,4 +1,6 @@
 class ProcessDocumentJob < ApplicationJob
+  include DocumentProcessingLogging
+
   queue_as :default
 
   discard_on ActiveRecord::RecordNotFound
@@ -48,7 +50,8 @@ class ProcessDocumentJob < ApplicationJob
   rescue ActiveRecord::RecordNotFound
     raise
   rescue => e
-    document&.mark_failed!(e.message)
+    friendly = log_and_friendly_message(e, context: "document #{document_id} extraction")
+    document&.mark_failed!(friendly)
     raise
   end
 end
