@@ -26,6 +26,21 @@ class DocumentTest < ActiveSupport::TestCase
     assert doc.errors[:file].any?
   end
 
+  test "invalid with unsupported MIME type" do
+    doc = @user.documents.new(title: "Exec")
+    doc.file.attach(io: StringIO.new("#!/bin/bash"), filename: "evil.sh", content_type: "application/x-sh")
+    assert_not doc.valid?
+    assert doc.errors[:file].any? { |m| m.include?("not supported") }
+  end
+
+  test "invalid when file exceeds 50 MB" do
+    doc = @user.documents.new(title: "Huge File")
+    doc.file.attach(io: StringIO.new("x"), filename: "big.txt", content_type: "text/plain")
+    doc.file.blob.define_singleton_method(:byte_size) { 51.megabytes.to_i }
+    assert_not doc.valid?
+    assert doc.errors[:file].any? { |m| m.include?("too large") }
+  end
+
   test "invalid with unknown status" do
     doc = @user.documents.new(title: "Test", status: "unknown")
     doc.file.attach(io: File.open(file_fixture("sample.txt")), filename: "sample.txt", content_type: "text/plain")

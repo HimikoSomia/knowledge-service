@@ -20,12 +20,12 @@ class EnrichDocumentJobTest < ActiveJob::TestCase
   end
 
   test "marks not_applicable when vision service is not configured" do
+    ENV.delete("OPENAI_API_KEY")
     @document.update_columns(extracted_content: {
       "sections" => [ { "type" => "image_ref", "page_number" => 1, "image_index" => 0 } ],
       "raw_text" => "",
       "metadata" => {}
     })
-    # OpenAIVisionService.configured? returns false by default (no OPENAI_API_KEY)
     EnrichDocumentJob.perform_now(@document.id)
     assert_equal "not_applicable", @document.reload.enrichment_status
   end

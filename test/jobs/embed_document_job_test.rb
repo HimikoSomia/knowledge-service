@@ -78,12 +78,14 @@ class EmbedDocumentJobTest < ActiveJob::TestCase
     create_chunks(@document, 1)
     stub_embedding_service_raising(Embedding::EmbeddingService::ServiceError, "timeout")
 
-    # retry_on catches the error on attempt 1 and re-enqueues — mark_embedding_failed!
+    # retry_on catches the error on attempt 1 and re-enqueues; mark_embedding_failed!
     # is still called before the re-raise so the document status reflects the failure.
     EmbedDocumentJob.perform_now(@document.id)
     @document.reload
     assert_equal "failed", @document.embedding_status
-    assert_match "timeout", @document.error_message
+    # Error message is sanitized to a user-friendly string
+    assert @document.error_message.present?
+    assert_not_equal "timeout", @document.error_message
   end
 
   test "skips when document is already embedded" do

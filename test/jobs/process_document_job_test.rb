@@ -45,7 +45,9 @@ class ProcessDocumentJobTest < ActiveJob::TestCase
     ProcessDocumentJob.perform_now(@document.id)
 
     assert_equal "failed", @document.reload.status
-    assert_equal "boom",   @document.error_message
+    # Error message is sanitized to a user-friendly string (raw "boom" is in logs only)
+    assert @document.error_message.present?
+    assert_not_equal "boom", @document.error_message
   ensure
     Extraction::DocumentExtractor.define_singleton_method(:new, &original_new)
   end
