@@ -84,4 +84,4 @@ gem "roo", "~> 2.10"             # XLSX/XLS/CSV/ODS spreadsheet parsing
 gem "rubyzip", "~> 2.3"          # PPTX (ZIP-based XML) parsing; also a roo dependency
 
 # AI / embeddings
-gem "ruby-openai", "~> 7.0"      # OpenAI API client (embeddings)
+gem "ruby-openai", "~> 8.3"      # OpenAI API client (embeddings)
