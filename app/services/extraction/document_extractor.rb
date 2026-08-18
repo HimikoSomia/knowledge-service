@@ -1,74 +1,84 @@
 class Extraction::DocumentExtractor
-  CONTENT_TYPE_MAP = {
-    "text/plain"          => Extraction::PlainTextExtractor,
-    "text/markdown"       => Extraction::PlainTextExtractor,
-    "text/csv"            => Extraction::CsvExtractor,
-    "application/json"    => Extraction::JsonExtractor,
-    "text/html"           => Extraction::HtmlExtractor,
-    "application/xhtml+xml" => Extraction::HtmlExtractor,
-    "application/xml"     => Extraction::HtmlExtractor,
-    "text/xml"            => Extraction::HtmlExtractor,
-    "application/pdf"     => Extraction::PdfExtractor,
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => Extraction::DocxExtractor,
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"       => Extraction::XlsxExtractor,
-    "application/vnd.ms-excel"                                                 => Extraction::XlsxExtractor,
-    "application/vnd.oasis.opendocument.spreadsheet"                           => Extraction::XlsxExtractor,
-    "application/vnd.openxmlformats-officedocument.presentationml.presentation" => Extraction::PptxExtractor,
-    # Image files
-    "image/jpeg"  => Extraction::ImageExtractor,
-    "image/jpg"   => Extraction::ImageExtractor,
-    "image/png"   => Extraction::ImageExtractor,
-    "image/webp"  => Extraction::ImageExtractor,
-    "image/gif"   => Extraction::ImageExtractor,
-    "image/tiff"  => Extraction::ImageExtractor,
-    "image/bmp"   => Extraction::ImageExtractor,
-    "image/heic"  => Extraction::ImageExtractor,
-    "image/heif"  => Extraction::ImageExtractor
-  }.freeze
+  UnsupportedTypeError = Class.new(ArgumentError)
 
-  EXTENSION_MAP = {
-    "txt"      => Extraction::PlainTextExtractor,
-    "md"       => Extraction::PlainTextExtractor,
-    "markdown" => Extraction::PlainTextExtractor,
-    "csv"      => Extraction::CsvExtractor,
-    "json"     => Extraction::JsonExtractor,
-    "html"     => Extraction::HtmlExtractor,
-    "htm"      => Extraction::HtmlExtractor,
-    "xml"      => Extraction::HtmlExtractor,
-    "pdf"      => Extraction::PdfExtractor,
-    "docx"     => Extraction::DocxExtractor,
-    "xlsx"     => Extraction::XlsxExtractor,
-    "xls"      => Extraction::XlsxExtractor,
-    "ods"      => Extraction::XlsxExtractor,
-    "pptx"     => Extraction::PptxExtractor,
-    # Image files
-    "jpg"      => Extraction::ImageExtractor,
-    "jpeg"     => Extraction::ImageExtractor,
-    "png"      => Extraction::ImageExtractor,
-    "webp"     => Extraction::ImageExtractor,
-    "gif"      => Extraction::ImageExtractor,
-    "tiff"     => Extraction::ImageExtractor,
-    "tif"      => Extraction::ImageExtractor,
-    "bmp"      => Extraction::ImageExtractor,
-    "heic"     => Extraction::ImageExtractor,
-    "heif"     => Extraction::ImageExtractor
-  }.freeze
+  FORMATS = [
+    { type: "txt", extractor: Extraction::PlainTextExtractor, content_types: %w[text/plain], extensions: %w[txt] },
+    { type: "md", extractor: Extraction::PlainTextExtractor, content_types: %w[text/markdown], extensions: %w[md markdown] },
+    { type: "csv", extractor: Extraction::CsvExtractor, content_types: %w[text/csv], extensions: %w[csv] },
+    { type: "json", extractor: Extraction::JsonExtractor, content_types: %w[application/json], extensions: %w[json] },
+    { type: "html", extractor: Extraction::HtmlExtractor, content_types: %w[text/html application/xhtml+xml], extensions: %w[html htm] },
+    { type: "xml", extractor: Extraction::HtmlExtractor, content_types: %w[application/xml text/xml], extensions: %w[xml] },
+    { type: "pdf", extractor: Extraction::PdfExtractor, content_types: %w[application/pdf], extensions: %w[pdf] },
+    {
+      type: "docx",
+      extractor: Extraction::DocxExtractor,
+      content_types: %w[application/vnd.openxmlformats-officedocument.wordprocessingml.document],
+      extensions: %w[docx]
+    },
+    {
+      type: "xlsx",
+      extractor: Extraction::XlsxExtractor,
+      content_types: %w[application/vnd.openxmlformats-officedocument.spreadsheetml.sheet],
+      extensions: %w[xlsx]
+    },
+    { type: "xls", extractor: Extraction::XlsxExtractor, content_types: %w[application/vnd.ms-excel], extensions: %w[xls] },
+    {
+      type: "ods",
+      extractor: Extraction::XlsxExtractor,
+      content_types: %w[application/vnd.oasis.opendocument.spreadsheet],
+      extensions: %w[ods]
+    },
+    {
+      type: "pptx",
+      extractor: Extraction::PptxExtractor,
+      content_types: %w[application/vnd.openxmlformats-officedocument.presentationml.presentation],
+      extensions: %w[pptx]
+    },
+    { type: "jpeg", extractor: Extraction::ImageExtractor, content_types: %w[image/jpeg image/jpg], extensions: %w[jpg jpeg] },
+    { type: "png", extractor: Extraction::ImageExtractor, content_types: %w[image/png], extensions: %w[png] },
+    { type: "webp", extractor: Extraction::ImageExtractor, content_types: %w[image/webp], extensions: %w[webp] },
+    { type: "gif", extractor: Extraction::ImageExtractor, content_types: %w[image/gif], extensions: %w[gif] },
+    { type: "tiff", extractor: Extraction::ImageExtractor, content_types: %w[image/tiff], extensions: %w[tif tiff] },
+    { type: "bmp", extractor: Extraction::ImageExtractor, content_types: %w[image/bmp], extensions: %w[bmp] },
+    { type: "heic", extractor: Extraction::ImageExtractor, content_types: %w[image/heic], extensions: %w[heic] },
+    { type: "heif", extractor: Extraction::ImageExtractor, content_types: %w[image/heif], extensions: %w[heif] }
+  ].freeze
 
-  # Returns an extractor instance appropriate for the given Active Storage blob.
-  def for(blob)
-    extractor_class = CONTENT_TYPE_MAP[blob.content_type]
-    extractor_class ||= EXTENSION_MAP[file_extension(blob)]
+  CONTENT_TYPE_INDEX = FORMATS.each_with_object({}) do |format, index|
+    format[:content_types].each { |content_type| index[content_type] = format }
+  end.freeze
 
-    if extractor_class
-      extractor_class.new
-    else
-      Extraction::FallbackExtractor.new(content_type: blob.content_type)
+  EXTENSION_INDEX = FORMATS.each_with_object({}) do |format, index|
+    format[:extensions].each { |extension| index[extension] = format }
+  end.freeze
+
+  class << self
+    def supported?(blob)
+      format_for(blob).present?
+    end
+
+    def document_type_for(blob)
+      extension = file_extension(blob)
+      return extension if EXTENSION_INDEX.key?(extension)
+
+      CONTENT_TYPE_INDEX.dig(blob.content_type, :type)
+    end
+
+    def format_for(blob)
+      CONTENT_TYPE_INDEX[blob.content_type] || EXTENSION_INDEX[file_extension(blob)]
+    end
+
+    private
+
+    def file_extension(blob)
+      File.extname(blob.filename.to_s).delete_prefix(".").downcase
     end
   end
 
-  private
+  def for(blob)
+    format = self.class.format_for(blob)
+    return format[:extractor].new if format
 
-  def file_extension(blob)
-    File.extname(blob.filename.to_s).delete_prefix(".").downcase
+    raise UnsupportedTypeError, "Unsupported document type: #{blob.content_type.inspect}"
   end
 end

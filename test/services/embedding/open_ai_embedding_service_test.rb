@@ -49,7 +49,7 @@ class Embedding::OpenAiEmbeddingServiceTest < ActiveSupport::TestCase
     ENV["OPENAI_EMBEDDING_DIMENSIONS"] = "3072"
     svc = Embedding::OpenAiEmbeddingService.new
     stub_client([])
-    err = assert_raises(Embedding::EmbeddingService::ConfigurationError) do
+    err = assert_raises(Embedding::OpenAiEmbeddingService::ConfigurationError) do
       svc.embed_texts([ "hello" ])
     end
     assert_match "3072", err.message
@@ -58,7 +58,7 @@ class Embedding::OpenAiEmbeddingServiceTest < ActiveSupport::TestCase
 
   test "raises ConfigurationError when API key is missing" do
     ENV.delete("OPENAI_API_KEY")
-    assert_raises(Embedding::EmbeddingService::ConfigurationError) do
+    assert_raises(Embedding::OpenAiEmbeddingService::ConfigurationError) do
       @service.embed_texts([ "hello" ])
     end
   end
@@ -103,14 +103,14 @@ class Embedding::OpenAiEmbeddingServiceTest < ActiveSupport::TestCase
   # ── error handling ─────────────────────────────────────────────────────────
 
   test "raises InvalidInputError for blank text" do
-    assert_raises(Embedding::EmbeddingService::InvalidInputError) do
+    assert_raises(Embedding::OpenAiEmbeddingService::InvalidInputError) do
       @service.embed_texts([ "   " ])
     end
   end
 
   test "raises ValidationError when API returns empty data" do
     stub_client_with_response({ "data" => [], "usage" => {} })
-    assert_raises(Embedding::EmbeddingService::ValidationError) do
+    assert_raises(Embedding::OpenAiEmbeddingService::ValidationError) do
       @service.embed_texts([ "hello" ])
     end
   end
@@ -118,7 +118,7 @@ class Embedding::OpenAiEmbeddingServiceTest < ActiveSupport::TestCase
   test "raises ValidationError when returned count does not match input" do
     # Input has 2 texts, response has 1 embedding
     stub_client_with_response({ "data" => [ { "index" => 0, "embedding" => fake_vector } ], "usage" => {} })
-    assert_raises(Embedding::EmbeddingService::ValidationError) do
+    assert_raises(Embedding::OpenAiEmbeddingService::ValidationError) do
       @service.embed_texts([ "text a", "text b" ])
     end
   end
@@ -126,35 +126,35 @@ class Embedding::OpenAiEmbeddingServiceTest < ActiveSupport::TestCase
   test "raises ValidationError when vector dimension is wrong" do
     wrong_dim_vector = Array.new(512, 0.1)
     stub_client([ wrong_dim_vector ])
-    assert_raises(Embedding::EmbeddingService::ValidationError) do
+    assert_raises(Embedding::OpenAiEmbeddingService::ValidationError) do
       @service.embed_texts([ "hello" ])
     end
   end
 
   test "raises RateLimitError on HTTP 429" do
     stub_client_with_openai_error(status: 429, message: "rate limited")
-    assert_raises(Embedding::EmbeddingService::RateLimitError) do
+    assert_raises(Embedding::OpenAiEmbeddingService::RateLimitError) do
       @service.embed_texts([ "hello" ])
     end
   end
 
   test "raises ConfigurationError on HTTP 401" do
     stub_client_with_openai_error(status: 401, message: "unauthorized")
-    assert_raises(Embedding::EmbeddingService::ConfigurationError) do
+    assert_raises(Embedding::OpenAiEmbeddingService::ConfigurationError) do
       @service.embed_texts([ "hello" ])
     end
   end
 
   test "raises ServiceError on HTTP 500" do
     stub_client_with_openai_error(status: 500, message: "internal error")
-    assert_raises(Embedding::EmbeddingService::ServiceError) do
+    assert_raises(Embedding::OpenAiEmbeddingService::ServiceError) do
       @service.embed_texts([ "hello" ])
     end
   end
 
   test "raises ServiceError on network timeout" do
     stub_client_with_network_error(Faraday::TimeoutError)
-    assert_raises(Embedding::EmbeddingService::ServiceError) do
+    assert_raises(Embedding::OpenAiEmbeddingService::ServiceError) do
       @service.embed_texts([ "hello" ])
     end
   end

@@ -10,9 +10,9 @@ module ApplicationHelper
     class_names(
       "badge badge-sm font-medium capitalize",
       case status
-      when "processed", "embedded"
+      when "processed", "ready"
         "badge-success"
-      when "processing"
+      when "processing", "enriching", "embedding"
         "badge-info"
       when "failed", "error"
         "badge-error"
@@ -20,23 +20,6 @@ module ApplicationHelper
         "badge-ghost"
       end
     )
-  end
-
-  # Returns a badge showing the embedding readiness of a document.
-  def embedding_status_badge(document)
-    label, css = case document.embedding_status
-    when "embedded"        then [ "Searchable",    "badge-success" ]
-    when "embedding"       then [ "Embedding…",    "badge-info" ]
-    when "pending"         then [ "Queued",         "badge-ghost" ]
-    when "failed"          then [ "Embed failed",   "badge-error" ]
-    when "not_configured"  then [ "Not configured", "badge-ghost" ]
-    when "not_applicable"  then [ nil, nil ]  # no badge for empty documents
-    else                        [ nil, nil ]
-    end
-
-    return "" if label.nil?
-
-    content_tag(:span, label, class: "badge badge-xs font-medium #{css}")
   end
 
   def short_date_time(value)

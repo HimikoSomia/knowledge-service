@@ -3,19 +3,16 @@ pending_doc:
   document_type: "txt"
   status: "pending"
   chunk_count: 0
-  enrichment_status: "not_applicable"
-  embedding_status: "not_started"
   user: one
 
 processed_doc:
   title: "Processed Document"
   document_type: "pdf"
-  status: "processed"
+  status: "ready"
   chunk_count: 3
   processed_at: 2026-07-26 10:00:00
   file_checksum: "abc123"
-  enrichment_status: "not_applicable"
-  embedding_status: "embedded"
+  embedded_at: 2026-07-26 10:01:00
   user: one
 
 failed_doc:
@@ -24,6 +21,4 @@ failed_doc:
   status: "failed"
   chunk_count: 0
   error_message: "Extraction failed: unreadable file"
-  enrichment_status: "not_applicable"
-  embedding_status: "not_started"
   user: two

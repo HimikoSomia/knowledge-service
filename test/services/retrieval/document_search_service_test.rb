@@ -7,14 +7,11 @@ class Retrieval::DocumentSearchServiceTest < ActiveSupport::TestCase
     @user_one = users(:one)
     @user_two = users(:two)
     ENV["OPENAI_API_KEY"] = "test-key"
-    @original_service_new = Embedding::OpenAiEmbeddingService.method(:new)
   end
 
   teardown do
     ENV.delete("OPENAI_API_KEY")
-    if Embedding::OpenAiEmbeddingService.singleton_class.method_defined?(:new, false)
-      Embedding::OpenAiEmbeddingService.singleton_class.remove_method(:new)
-    end
+    ENV.delete("OPENAI_EMBEDDING_MODEL")
   end
 
   test "returns chunks closest to the query vector" do
@@ -23,9 +20,7 @@ class Retrieval::DocumentSearchServiceTest < ActiveSupport::TestCase
     far_chunk    = create_embedded_chunk(doc, 1, content: "Cheese is made from milk",        vector_seed: 0.0)
 
     # Query vector identical to near_chunk → cosine distance 0
-    stub_embedding_service(Array.new(DB_DIMS, 1.0))
-
-    service = Retrieval::DocumentSearchService.new(@user_one)
+    service = search_service(@user_one, Array.new(DB_DIMS, 1.0))
     results = service.search("Python programming")
 
     assert results.any?, "Expected at least one result"
@@ -36,9 +31,7 @@ class Retrieval::DocumentSearchServiceTest < ActiveSupport::TestCase
     other_doc  = create_processed_document(@user_two, "Private Doc")
     create_embedded_chunk(other_doc, 0, content: "Secret content", vector_seed: 1.0)
 
-    stub_embedding_service(Array.new(DB_DIMS, 1.0))
-
-    results = Retrieval::DocumentSearchService.new(@user_one).search("anything")
+    results = search_service(@user_one, Array.new(DB_DIMS, 1.0)).search("anything")
     ids = results.map(&:id)
     assert_empty(ids.select { |id| DocumentChunk.find(id).document.user_id == @user_two.id })
   end
@@ -48,8 +41,7 @@ class Retrieval::DocumentSearchServiceTest < ActiveSupport::TestCase
     doc.update_columns(status: "pending")
     create_embedded_chunk(doc, 0, content: "Draft content", vector_seed: 1.0)
 
-    stub_embedding_service(Array.new(DB_DIMS, 1.0))
-    results = Retrieval::DocumentSearchService.new(@user_one).search("draft")
+    results = search_service(@user_one, Array.new(DB_DIMS, 1.0)).search("draft")
     assert_empty results.to_a
   end
 
@@ -62,8 +54,7 @@ class Retrieval::DocumentSearchServiceTest < ActiveSupport::TestCase
       metadata:    {}
     )
 
-    stub_embedding_service(Array.new(DB_DIMS, 1.0))
-    results = Retrieval::DocumentSearchService.new(@user_one).search("anything")
+    results = search_service(@user_one, Array.new(DB_DIMS, 1.0)).search("anything")
     assert_empty results.to_a
   end
 
@@ -73,9 +64,7 @@ class Retrieval::DocumentSearchServiceTest < ActiveSupport::TestCase
     chunk.update_columns(embedding_model: "text-embedding-ada-002")
 
     ENV["OPENAI_EMBEDDING_MODEL"] = "text-embedding-3-small"
-    stub_embedding_service(Array.new(DB_DIMS, 1.0))
-
-    results = Retrieval::DocumentSearchService.new(@user_one).search("old")
+    results = search_service(@user_one, Array.new(DB_DIMS, 1.0)).search("old")
     assert_empty results.to_a
   end
 
@@ -88,9 +77,8 @@ class Retrieval::DocumentSearchServiceTest < ActiveSupport::TestCase
     create_embedded_chunk(doc_in,  0, content: "Inside",  vector_seed: 1.0)
     create_embedded_chunk(doc_out, 0, content: "Outside", vector_seed: 1.0)
 
-    stub_embedding_service(Array.new(DB_DIMS, 1.0))
-    results = Retrieval::DocumentSearchService.new(@user_one)
-                                              .search("topic", workspace_id: workspace.id)
+    results = search_service(@user_one, Array.new(DB_DIMS, 1.0))
+      .search("topic", workspace_id: workspace.id)
     document_ids = results.map { |c| c.document_id }.uniq
     assert_includes document_ids, doc_in.id
     assert_not_includes document_ids, doc_out.id
@@ -115,7 +103,7 @@ class Retrieval::DocumentSearchServiceTest < ActiveSupport::TestCase
     doc = user.documents.new(title: title)
     doc.file.attach(io: StringIO.new("test"), filename: "test.txt", content_type: "text/plain")
     doc.save!
-    doc.update_columns(status: "processed", embedding_status: "embedded")
+    doc.update_columns(status: "ready", processed_at: Time.current, embedded_at: Time.current)
     doc
   end
 
@@ -130,10 +118,11 @@ class Retrieval::DocumentSearchServiceTest < ActiveSupport::TestCase
     chunk
   end
 
-  def stub_embedding_service(query_vector)
-    stub = @original_service_new.call
+  def search_service(user, query_vector)
+    stub = Object.new
     stub.define_singleton_method(:configured?) { true }
+    stub.define_singleton_method(:model) { "text-embedding-3-small" }
     stub.define_singleton_method(:embed_texts) { |_| [ query_vector ] }
-    Embedding::OpenAiEmbeddingService.define_singleton_method(:new) { stub }
+    Retrieval::DocumentSearchService.new(user, embedding_service: stub)
   end
 end

@@ -1,6 +1,6 @@
 require "openai"
 
-# OpenAI implementation of Embedding::EmbeddingService.
+# Generates embeddings through OpenAI.
 #
 # Configuration (ENV or Rails credentials):
 #   OPENAI_API_KEY              — required
@@ -14,7 +14,13 @@ require "openai"
 #   text-embedding-ada-002  → 1536                  ✓
 #   text-embedding-3-large  → 3072 (needs migration) ✗
 #
-class Embedding::OpenAiEmbeddingService < Embedding::EmbeddingService
+class Embedding::OpenAiEmbeddingService
+  ConfigurationError = Class.new(StandardError)
+  RateLimitError = Class.new(StandardError)
+  ServiceError = Class.new(StandardError)
+  ValidationError = Class.new(StandardError)
+  InvalidInputError = Class.new(StandardError)
+
   # The number of dimensions the current schema column supports.
   DB_DIMENSIONS = 1536
 
@@ -35,10 +41,9 @@ class Embedding::OpenAiEmbeddingService < Embedding::EmbeddingService
   end
 
   # Embeds an array of plain-text strings and returns an array of float vectors
-  # in the same order. Raises one of the Embedding::EmbeddingService error
-  # subclasses on failure.
+  # in the same order. Raises one of the error classes above on failure.
   def embed_texts(texts)
-    raise Embedding::EmbeddingService::ConfigurationError,
+    raise ConfigurationError,
       "OPENAI_API_KEY is not configured" unless configured?
 
     validate_dimensions!
@@ -49,7 +54,7 @@ class Embedding::OpenAiEmbeddingService < Embedding::EmbeddingService
     preprocessed = texts.map { |t| preprocess(t) }
     blank_indices = preprocessed.each_index.select { |i| preprocessed[i].blank? }
     unless blank_indices.empty?
-      raise Embedding::EmbeddingService::InvalidInputError,
+      raise InvalidInputError,
         "Texts at indices #{blank_indices.join(', ')} are blank after preprocessing"
     end
 
@@ -71,7 +76,7 @@ class Embedding::OpenAiEmbeddingService < Embedding::EmbeddingService
 
   def validate_dimensions!
     if dimensions != DB_DIMENSIONS
-      raise Embedding::EmbeddingService::ConfigurationError,
+      raise ConfigurationError,
         "OPENAI_EMBEDDING_DIMENSIONS=#{dimensions} does not match the database " \
         "vector column width (#{DB_DIMENSIONS}). " \
         "Run a migration to change the column before using a different dimension."
@@ -88,12 +93,12 @@ class Embedding::OpenAiEmbeddingService < Embedding::EmbeddingService
     data = response["data"]
 
     if data.nil? || data.empty?
-      raise Embedding::EmbeddingService::ValidationError,
+      raise ValidationError,
         "Empty response from OpenAI embeddings API (model=#{model})"
     end
 
     if data.size != texts.size
-      raise Embedding::EmbeddingService::ValidationError,
+      raise ValidationError,
         "OpenAI returned #{data.size} embeddings but #{texts.size} were requested"
     end
 
@@ -102,14 +107,14 @@ class Embedding::OpenAiEmbeddingService < Embedding::EmbeddingService
 
     vectors.each_with_index do |vec, i|
       if vec.size != dimensions
-        raise Embedding::EmbeddingService::ValidationError,
+        raise ValidationError,
           "Embedding at position #{i} has #{vec.size} dimensions, expected #{dimensions}"
       end
     end
 
     vectors
   rescue Faraday::TimeoutError, Faraday::ConnectionFailed => e
-    raise Embedding::EmbeddingService::ServiceError,
+    raise ServiceError,
       "Network error calling OpenAI: #{e.message}"
   rescue OpenAI::Error => e
     handle_openai_error(e)
@@ -121,19 +126,19 @@ class Embedding::OpenAiEmbeddingService < Embedding::EmbeddingService
 
     case status
     when 401
-      raise Embedding::EmbeddingService::ConfigurationError,
+      raise ConfigurationError,
         "OpenAI authentication failed — check OPENAI_API_KEY (HTTP 401)"
     when 400
-      raise Embedding::EmbeddingService::InvalidInputError,
+      raise InvalidInputError,
         "OpenAI rejected the input (HTTP 400): #{message}"
     when 429
-      raise Embedding::EmbeddingService::RateLimitError,
+      raise RateLimitError,
         "OpenAI rate limit exceeded (HTTP 429): #{message}"
     when 500, 502, 503, 504
-      raise Embedding::EmbeddingService::ServiceError,
+      raise ServiceError,
         "OpenAI service error (HTTP #{status}): #{message}"
     else
-      raise Embedding::EmbeddingService::ServiceError,
+      raise ServiceError,
         "OpenAI error (HTTP #{status || 'unknown'}): #{message}"
     end
   end

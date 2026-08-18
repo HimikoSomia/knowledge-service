@@ -82,17 +82,17 @@ Copy [`.env.example`](.env.example) to `.env`; dotenv loads it in development an
 | `OPENAI_EMBEDDING_BATCH_SIZE` | No | Number of chunks per embedding request; defaults to `100`. |
 | `OPENAI_VISION_MODEL` | No | Vision model for image descriptions; defaults to `gpt-4o-mini`. |
 
-Without `OPENAI_API_KEY`, document extraction and chunking still run, but embeddings are marked as not configured and semantic search is unavailable. Image enrichment is also skipped. Development and production use local Active Storage by default; configure an S3 service in [`config/storage.yml`](config/storage.yml) and select it in the relevant environment before using object storage.
+Without `OPENAI_API_KEY`, document extraction and chunking still run, but the document remains `processed` rather than `ready`, so semantic search is unavailable. Image enrichment is also skipped. Development and production use local Active Storage by default; configure an S3 service in [`config/storage.yml`](config/storage.yml) and select it in the relevant environment before using object storage.
 
 ## How processing works
 
 1. Uploading a document queues `ProcessDocumentJob`.
 2. The job extracts structured text, stores extraction metadata, and creates document chunks.
-3. Documents containing image references may queue optional vision enrichment.
-4. Documents with chunks queue `EmbedDocumentJob`, which stores 1,536-dimension vectors using the configured embedding model.
+3. Documents containing image references run optional vision enrichment.
+4. After enrichment finishes (or is skipped), documents with chunks run `EmbedDocumentJob`, which stores 1,536-dimension vectors using the configured embedding model.
 5. Workspace search embeds the query and returns only the signed-in user's embedded chunks that belong to that workspace.
 
-Processing and embedding retry transient failures. Check the document status and application logs when a job fails.
+The stages run sequentially, and the document has one lifecycle status from `pending` through `ready`. Processing retries transient failures. Check the document status and application logs when a job fails.
 
 ## Tests and checks
 

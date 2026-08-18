@@ -45,16 +45,6 @@ class Extraction::ExtractorsTest < ActiveSupport::TestCase
     assert_equal "html", result.metadata["extractor"]
   end
 
-  # --- FallbackExtractor ---
-
-  test "FallbackExtractor returns empty result with unsupported flag" do
-    extractor = Extraction::FallbackExtractor.new(content_type: "application/octet-stream")
-    result = extract_with_instance(extractor, "sample.txt")
-    assert result.empty?
-    assert result.metadata["unsupported"]
-    assert_equal "fallback", result.metadata["extractor"]
-  end
-
   # --- DocumentExtractor (factory) ---
 
   test "DocumentExtractor dispatches plain text blob to PlainTextExtractor" do
@@ -77,9 +67,16 @@ class Extraction::ExtractorsTest < ActiveSupport::TestCase
     assert_instance_of Extraction::JsonExtractor, extractor
   end
 
-  test "DocumentExtractor returns FallbackExtractor for truly unknown file" do
-    extractor = Extraction::DocumentExtractor.new.for(mock_blob("file.xyz", "application/octet-stream"))
-    assert_instance_of Extraction::FallbackExtractor, extractor
+  test "DocumentExtractor rejects a truly unknown file" do
+    assert_raises Extraction::DocumentExtractor::UnsupportedTypeError do
+      Extraction::DocumentExtractor.new.for(mock_blob("file.xyz", "application/octet-stream"))
+    end
+  end
+
+  test "DocumentExtractor is the source of truth for support and document type" do
+    blob = mock_blob("sample.csv", "application/octet-stream")
+    assert Extraction::DocumentExtractor.supported?(blob)
+    assert_equal "csv", Extraction::DocumentExtractor.document_type_for(blob)
   end
 
   private
@@ -89,14 +86,6 @@ class Extraction::ExtractorsTest < ActiveSupport::TestCase
       tmp.write(File.read(file_fixture(fixture_name)))
       tmp.rewind
       extractor_class.new.extract(tmp)
-    end
-  end
-
-  def extract_with_instance(extractor, fixture_name)
-    Tempfile.create([ "test", File.extname(fixture_name) ]) do |tmp|
-      tmp.write(File.read(file_fixture(fixture_name)))
-      tmp.rewind
-      extractor.extract(tmp)
     end
   end
 

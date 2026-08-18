@@ -2,7 +2,7 @@ require "openai"
 require "base64"
 require "open3"
 
-# OpenAI GPT-4o Vision implementation of Enrichment::VisionService.
+# OpenAI vision service for image descriptions.
 #
 # For each image_ref section this service:
 #   1. Renders the relevant page (PDF) or uses the uploaded file directly (image files).
@@ -13,7 +13,7 @@ require "open3"
 #   OPENAI_API_KEY          — required (shared with embedding service)
 #   OPENAI_VISION_MODEL     — default: "gpt-4o-mini"
 #
-class Enrichment::OpenAiVisionService < Enrichment::VisionService
+class Enrichment::OpenAiVisionService
   VisionError = Class.new(StandardError)
 
   # Render pages at 150 DPI — sufficient for vision without excessive file size.
@@ -159,4 +159,3 @@ class Enrichment::OpenAiVisionService < Enrichment::VisionService
     @pdftoppm ||= system("which pdftoppm > /dev/null 2>&1")
   end
 end
-

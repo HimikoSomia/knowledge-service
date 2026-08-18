@@ -23,10 +23,6 @@ class Extraction::ImageExtractorTest < ActiveSupport::TestCase
     assert_equal "image", result.metadata["extractor"]
   end
 
-  test "returns image_ref with ocr_unavailable reason when tesseract missing" do
-    skip "redundant with above — covered by ocr_unavailable assertion"
-  end
-
   test "returns image_ref when OCR text is below threshold" do
     stub_ocr(available: true, text: "a few words", word_count: 3)
 

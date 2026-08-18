@@ -19,13 +19,13 @@ module DocumentProcessingLogging
 
   def friendly_message_for(exception)
     case exception
-    when Embedding::EmbeddingService::RateLimitError
+    when Embedding::OpenAiEmbeddingService::RateLimitError
       "Embedding service is temporarily rate-limited. Processing will retry automatically."
-    when Embedding::EmbeddingService::ServiceError
+    when Embedding::OpenAiEmbeddingService::ServiceError
       "Embedding service is temporarily unavailable. Processing will retry automatically."
-    when Embedding::EmbeddingService::ConfigurationError
+    when Embedding::OpenAiEmbeddingService::ConfigurationError
       "Embedding service is not configured. Please check the application settings."
-    when Embedding::EmbeddingService::InvalidInputError
+    when Embedding::OpenAiEmbeddingService::InvalidInputError
       "A chunk could not be embedded due to invalid content."
     when Timeout::Error, Faraday::TimeoutError, Faraday::ConnectionFailed
       "Processing timed out. It will be retried automatically."

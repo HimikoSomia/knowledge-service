@@ -70,8 +70,8 @@ class DocumentTest < ActiveSupport::TestCase
     assert documents(:pending_doc).pending?
   end
 
-  test "processed? returns true for processed status" do
-    assert documents(:processed_doc).processed?
+  test "ready? returns true for a searchable document" do
+    assert documents(:processed_doc).ready?
   end
 
   test "failed? returns true for failed status" do
@@ -87,16 +87,25 @@ class DocumentTest < ActiveSupport::TestCase
     end
   end
 
-  test "mark_processed! sets status, chunk_count, file_checksum, processed_at" do
+  test "record_extraction! stores chunk metadata without completing the pipeline" do
     doc = documents(:pending_doc)
     freeze_time do
-      doc.mark_processed!(5, "abc123")
+      doc.record_extraction!(5, "abc123")
       doc.reload
-      assert_equal "processed", doc.status
+      assert_equal "pending", doc.status
       assert_equal 5, doc.chunk_count
       assert_equal "abc123", doc.file_checksum
       assert_in_delta Time.current, doc.processed_at, 1.second
       assert_nil doc.error_message
+    end
+  end
+
+  test "mark_ready! sets the final status and embedded timestamp" do
+    doc = documents(:pending_doc)
+    freeze_time do
+      doc.mark_ready!
+      assert_equal "ready", doc.reload.status
+      assert_in_delta Time.current, doc.embedded_at, 1.second
     end
   end
 
@@ -110,7 +119,7 @@ class DocumentTest < ActiveSupport::TestCase
 
   # --- Idempotency ---
 
-  test "already_processed_for? is true when processed with same checksum" do
+  test "already_processed_for? is true when ready with same checksum" do
     doc = documents(:processed_doc)
     assert doc.already_processed_for?("abc123")
   end

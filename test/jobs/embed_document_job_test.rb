@@ -1,38 +1,26 @@
 require "test_helper"
 
 class EmbedDocumentJobTest < ActiveJob::TestCase
-  DB_DIMS = Embedding::OpenAiEmbeddingService::DB_DIMENSIONS  # 1536
+  DB_DIMS = Embedding::OpenAiEmbeddingService::DB_DIMENSIONS
 
   setup do
     @user = users(:one)
     @document = @user.documents.new(title: "Embed Test Doc")
     @document.file.attach(
-      io:           File.open(file_fixture("sample.txt")),
-      filename:     "sample.txt",
+      io: File.open(file_fixture("sample.txt")),
+      filename: "sample.txt",
       content_type: "text/plain"
     )
     @document.save!
-    # Set up as fully processed with chunks, ready for embedding
-    @document.update_columns(status: "processed", file_checksum: "abc", embedding_status: "pending")
-    @original_service_new = Embedding::OpenAiEmbeddingService.method(:new)
-    ENV["OPENAI_API_KEY"] = "test-key"
+    @document.update_columns(status: "embedding", file_checksum: "abc", processed_at: Time.current)
   end
 
-  teardown do
-    ENV.delete("OPENAI_API_KEY")
-    if Embedding::OpenAiEmbeddingService.singleton_class.method_defined?(:new, false)
-      Embedding::OpenAiEmbeddingService.singleton_class.remove_method(:new)
-    end
-  end
-
-  test "embeds unprocessed chunks and marks document embedded" do
+  test "embeds missing chunks and marks document ready" do
     create_chunks(@document, 2)
-    stub_embedding_service(fake_vectors(2))
-
-    EmbedDocumentJob.perform_now(@document.id)
+    perform_job(embedding_service(vectors: fake_vectors(2)))
 
     @document.reload
-    assert_equal "embedded", @document.embedding_status
+    assert_equal "ready", @document.status
     assert_not_nil @document.embedded_at
     @document.document_chunks.each do |chunk|
       assert_not_nil chunk.embedding
@@ -40,66 +28,79 @@ class EmbedDocumentJobTest < ActiveJob::TestCase
     end
   end
 
-  test "skips chunks already embedded with the current model" do
+  test "embeds only chunks missing the current model" do
     create_chunks(@document, 2)
     vector = Array.new(DB_DIMS, 0.5)
-    # Pre-embed one chunk
     @document.document_chunks.order(:chunk_index).first.update_columns(
-      embedding: vector, embedding_model: "text-embedding-3-small"
+      embedding: vector,
+      embedding_model: "text-embedding-3-small"
     )
-
     call_count = 0
-    stub_embedding_service_counting([ fake_vectors(1) ]) { |n| call_count = n }
+    service = embedding_service(vectors: fake_vectors(1), counter: -> { call_count += 1 })
 
-    EmbedDocumentJob.perform_now(@document.id)
-    # Only 1 chunk should have been sent to the API
+    perform_job(service)
+
     assert_equal 1, call_count
-    assert_equal "embedded", @document.reload.embedding_status
+    assert_equal "ready", @document.reload.status
   end
 
-  test "marks not_configured when API key is absent" do
-    ENV.delete("OPENAI_API_KEY")
+  test "marks extracted document processed when API key is absent" do
     create_chunks(@document, 1)
+    service = embedding_service(configured: false)
 
-    EmbedDocumentJob.perform_now(@document.id)
-    assert_equal "not_configured", @document.reload.embedding_status
+    perform_job(service)
+
+    assert_equal "processed", @document.reload.status
+    assert_nil @document.embedded_at
   end
 
-  test "discards job on ConfigurationError without retrying" do
+  test "marks document failed on a permanent configuration error" do
     create_chunks(@document, 1)
-    stub_embedding_service_raising(Embedding::EmbeddingService::ConfigurationError, "bad config")
+    service = embedding_service(error: Embedding::OpenAiEmbeddingService::ConfigurationError.new("bad config"))
 
-    # discard_on means the job completes without raising to the test harness
-    assert_nothing_raised { EmbedDocumentJob.perform_now(@document.id) }
-    assert_equal "failed", @document.reload.embedding_status
+    assert_nothing_raised { perform_job(service) }
+
+    assert_equal "failed", @document.reload.status
   end
 
-  test "marks embedding_failed and sets error_message on ServiceError" do
+  test "marks document failed before retrying a transient service error" do
     create_chunks(@document, 1)
-    stub_embedding_service_raising(Embedding::EmbeddingService::ServiceError, "timeout")
+    service = embedding_service(error: Embedding::OpenAiEmbeddingService::ServiceError.new("timeout"))
 
-    # retry_on catches the error on attempt 1 and re-enqueues; mark_embedding_failed!
-    # is still called before the re-raise so the document status reflects the failure.
-    EmbedDocumentJob.perform_now(@document.id)
+    perform_job(service)
+
     @document.reload
-    assert_equal "failed", @document.embedding_status
-    # Error message is sanitized to a user-friendly string
+    assert_equal "failed", @document.status
     assert @document.error_message.present?
     assert_not_equal "timeout", @document.error_message
   end
 
-  test "skips when document is already embedded" do
-    @document.update_columns(embedding_status: "embedded")
-    # If this ran it would fail because no service is stubbed
-    EmbedDocumentJob.perform_now(@document.id)
-    assert_equal "embedded", @document.reload.embedding_status
+  test "skips a ready document when every chunk uses the current model" do
+    create_chunks(@document, 1, embedded: true)
+    @document.update_columns(status: "ready")
+    service = embedding_service(error: "embedding should not be called")
+
+    perform_job(service)
+
+    assert_equal "ready", @document.reload.status
   end
 
-  test "skips when document is not yet processed" do
-    @document.update_columns(status: "pending")
+  test "repairs a ready document that has a newly added unembedded chunk" do
     create_chunks(@document, 1)
-    EmbedDocumentJob.perform_now(@document.id)
-    # Status should remain pending on the document
+    @document.update_columns(status: "ready")
+
+    perform_job(embedding_service(vectors: fake_vectors(1)))
+
+    assert_equal "ready", @document.reload.status
+    assert_not_nil @document.document_chunks.first.embedding
+  end
+
+  test "skips when extraction has not completed" do
+    @document.update_columns(status: "pending", processed_at: nil)
+    create_chunks(@document, 1)
+
+    perform_job(embedding_service(vectors: fake_vectors(1)))
+
     assert_equal "pending", @document.reload.status
   end
 
@@ -107,7 +108,7 @@ class EmbedDocumentJobTest < ActiveJob::TestCase
     assert_nothing_raised { EmbedDocumentJob.perform_now(0) }
   end
 
-  test "enqueued by ProcessDocumentJob after successful chunking" do
+  test "is enqueued directly after extraction when enrichment is unnecessary" do
     assert_enqueued_jobs 1, only: EmbedDocumentJob do
       ProcessDocumentJob.perform_now(@document.id)
     end
@@ -115,17 +116,19 @@ class EmbedDocumentJobTest < ActiveJob::TestCase
 
   private
 
-  def create_chunks(document, count)
+  def create_chunks(document, count, embedded: false)
     now = Time.current
-    records = Array.new(count) do |i|
+    records = Array.new(count) do |index|
       {
-        document_id:      document.id,
-        chunk_index:       i,
-        content:           "Chunk content number #{i + 1}",
-        content_checksum:  "checksum#{i}",
-        metadata:          {},
-        created_at:        now,
-        updated_at:        now
+        document_id: document.id,
+        chunk_index: index,
+        content: "Chunk content number #{index + 1}",
+        content_checksum: "checksum#{index}",
+        embedding: embedded ? Array.new(DB_DIMS, 0.5) : nil,
+        embedding_model: embedded ? "text-embedding-3-small" : nil,
+        metadata: {},
+        created_at: now,
+        updated_at: now
       }
     end
     DocumentChunk.insert_all!(records)
@@ -136,35 +139,23 @@ class EmbedDocumentJobTest < ActiveJob::TestCase
     Array.new(count) { Array.new(DB_DIMS, 0.1) }
   end
 
-  def stub_embedding_service(vectors)
-    stub = @original_service_new.call
-    stub.define_singleton_method(:configured?)  { true }
-    stub.define_singleton_method(:model)        { "text-embedding-3-small" }
-    stub.define_singleton_method(:batch_size)   { 100 }
-    stub.define_singleton_method(:embed_texts)  { |_texts| vectors.shift(vectors.size) }
-    Embedding::OpenAiEmbeddingService.define_singleton_method(:new) { stub }
-  end
+  def embedding_service(vectors: [], configured: true, error: nil, counter: nil)
+    Object.new.tap do |service|
+      service.define_singleton_method(:configured?) { configured }
+      service.define_singleton_method(:model) { "text-embedding-3-small" }
+      service.define_singleton_method(:batch_size) { 100 }
+      service.define_singleton_method(:embed_texts) do |_texts|
+        counter&.call
+        raise error if error
 
-  def stub_embedding_service_counting(batched_vectors, &counter)
-    call = 0
-    stub = @original_service_new.call
-    stub.define_singleton_method(:configured?) { true }
-    stub.define_singleton_method(:model)       { "text-embedding-3-small" }
-    stub.define_singleton_method(:batch_size)  { 100 }
-    stub.define_singleton_method(:embed_texts) do |texts|
-      call += 1
-      counter.call(call)
-      batched_vectors[call - 1] || []
+        vectors
+      end
     end
-    Embedding::OpenAiEmbeddingService.define_singleton_method(:new) { stub }
   end
 
-  def stub_embedding_service_raising(error_class, message)
-    stub = @original_service_new.call
-    stub.define_singleton_method(:configured?) { true }
-    stub.define_singleton_method(:model)       { "text-embedding-3-small" }
-    stub.define_singleton_method(:batch_size)  { 100 }
-    stub.define_singleton_method(:embed_texts) { |_| raise error_class, message }
-    Embedding::OpenAiEmbeddingService.define_singleton_method(:new) { stub }
+  def perform_job(service)
+    job = EmbedDocumentJob.new(@document.id)
+    job.define_singleton_method(:embedding_service) { service }
+    job.perform_now
   end
 end

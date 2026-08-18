@@ -1,15 +1,8 @@
 # Asynchronous enrichment job that sends image_ref sections through a vision
 # AI service to produce human-readable descriptions.
 #
-# This job runs AFTER ProcessDocumentJob and is entirely optional. Failure here
-# does not affect the document's primary status — only enrichment_status changes.
-#
-# Current behavior:
-#   - If no vision service is configured, the job logs and marks enrichment as
-#     not_applicable, avoiding repeated retries.
-#   - If the vision service raises NotImplementedError (stub not yet implemented),
-#     the same applies.
-#   - Other errors are retried (via retry_on) before marking enrichment failed.
+# This optional stage runs after extraction and always hands the document to the
+# embedding stage when it finishes.
 #
 class EnrichDocumentJob < ApplicationJob
   include DocumentProcessingLogging
@@ -22,21 +15,21 @@ class EnrichDocumentJob < ApplicationJob
   def perform(document_id)
     document = Document.find(document_id)
 
-    return if document.enrichment_enriched?
+    return if document.ready?
 
     image_refs = pending_image_refs(document)
 
     if image_refs.empty?
-      Rails.logger.info "EnrichDocumentJob: document #{document_id} has no image refs, marking not_applicable"
-      document.update_columns(enrichment_status: "not_applicable")
+      Rails.logger.info "EnrichDocumentJob: document #{document_id} has no image refs"
+      continue_to_embedding(document)
       return
     end
 
-    vision = Enrichment::OpenAiVisionService.new
+    vision = vision_service
 
     unless vision.configured?
       Rails.logger.info "EnrichDocumentJob: vision service not configured, skipping document #{document_id}"
-      document.update_columns(enrichment_status: "not_applicable")
+      continue_to_embedding(document)
       return
     end
 
@@ -63,20 +56,27 @@ class EnrichDocumentJob < ApplicationJob
 
     document.mark_enriched!
     Rails.logger.info "EnrichDocumentJob: document #{document_id} enriched — #{new_chunks.size} new chunks"
-
-    # Re-queue embedding so the new enrichment chunks get their vectors.
-    EmbedDocumentJob.perform_later(document.id) if new_chunks.any?
-  rescue NotImplementedError => e
-    Rails.logger.warn "EnrichDocumentJob: vision service not implemented for document #{document_id}: #{e.message}"
-    document&.update_columns(enrichment_status: "not_applicable")
-    # Do not re-raise — expected until the vision service is implemented.
+    continue_to_embedding(document)
   rescue => e
     friendly = log_and_friendly_message(e, context: "document #{document_id} enrichment")
-    document&.mark_enrichment_failed!(friendly)
+    document&.mark_failed!(friendly)
     raise
   end
 
   private
+
+  def vision_service
+    Enrichment::OpenAiVisionService.new
+  end
+
+  def continue_to_embedding(document)
+    if document.document_chunks.exists?
+      document.mark_embedding!
+      EmbedDocumentJob.perform_later(document.id)
+    else
+      document.mark_processed!
+    end
+  end
 
   def pending_image_refs(document)
     document.extracted_content

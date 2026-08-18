@@ -19,32 +19,31 @@ class ProcessDocumentJob < ApplicationJob
 
       document.mark_processing!
 
-      extractor = Extraction::DocumentExtractor.new.for(document.file.blob)
+      extractor = extractor_for(document.file.blob)
       result    = extractor.extract(tempfile)
 
       document.update_columns(extracted_content: result.to_h)
 
       chunk_count = Chunking::DocumentChunker.new(document, result).chunk!
 
-      # Determine whether any image references need optional AI enrichment.
       has_image_refs = result.sections.any? { |s| s["type"] == "image_ref" }
-      needs_embedding = chunk_count > 0
+      document.record_extraction!(chunk_count, checksum)
 
-      document.mark_processed!(
-        chunk_count,
-        checksum,
-        enrichment_status: has_image_refs ? "pending" : "not_applicable",
-        embedding_status:  needs_embedding ? "pending"        : "not_applicable"
-      )
-
-      EnrichDocumentJob.perform_later(document.id) if has_image_refs
-      EmbedDocumentJob.perform_later(document.id)  if needs_embedding
+      next_job = if has_image_refs
+        document.mark_enriching!
+        EnrichDocumentJob.perform_later(document.id)
+        "enrichment queued"
+      elsif chunk_count.positive?
+        document.mark_embedding!
+        EmbedDocumentJob.perform_later(document.id)
+        "embedding queued"
+      else
+        document.mark_processed!
+        "processing complete"
+      end
 
       Rails.logger.info do
-        parts = [ "ProcessDocumentJob: document #{document_id} processed — #{chunk_count} chunks" ]
-        parts << "enrichment queued" if has_image_refs
-        parts << "embedding queued"  if needs_embedding
-        parts.join(", ")
+        "ProcessDocumentJob: document #{document_id} extracted — #{chunk_count} chunks, #{next_job}"
       end
     end
   rescue ActiveRecord::RecordNotFound
@@ -53,5 +52,11 @@ class ProcessDocumentJob < ApplicationJob
     friendly = log_and_friendly_message(e, context: "document #{document_id} extraction")
     document&.mark_failed!(friendly)
     raise
+  end
+
+  private
+
+  def extractor_for(blob)
+    Extraction::DocumentExtractor.new.for(blob)
   end
 end

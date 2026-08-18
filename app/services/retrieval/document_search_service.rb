@@ -14,8 +14,9 @@ class Retrieval::DocumentSearchService
 
   DEFAULT_LIMIT = 10
 
-  def initialize(user)
+  def initialize(user, embedding_service: Embedding::OpenAiEmbeddingService.new)
     @user = user
+    @embedding_service = embedding_service
   end
 
   # Generates a query embedding and returns the most semantically similar
@@ -33,7 +34,7 @@ class Retrieval::DocumentSearchService
 
     query_vector = service.embed_texts([ query.strip ]).first
 
-    authorized_chunk_scope(workspace_id)
+    authorized_chunk_scope(workspace_id, model: service.model)
       .nearest_neighbors(:embedding, query_vector, distance: "cosine")
       .limit(limit)
   end
@@ -41,31 +42,26 @@ class Retrieval::DocumentSearchService
   private
 
   def embedding_service
-    Embedding::OpenAiEmbeddingService.new
+    @embedding_service
   end
 
   # Returns a DocumentChunk relation scoped to the current user's accessible
   # documents. Authorization and readiness checks live in SQL — no post-filter.
-  def authorized_chunk_scope(workspace_id)
+  def authorized_chunk_scope(workspace_id, model:)
     scope = DocumentChunk
       .joins(:document)
       .where(
-        documents:       { user_id: @user.id, status: "processed", embedding_status: "embedded" },
-        document_chunks: { embedding_model: current_model }
+        documents:       { user_id: @user.id, status: "ready" },
+        document_chunks: { embedding_model: model }
       )
       .where.not(document_chunks: { embedding: nil })
 
     if workspace_id.present?
       scope = scope
-        .joins("INNER JOIN document_workspaces " \
-               "ON document_workspaces.document_id = documents.id")
+        .joins(document: :document_workspaces)
         .where(document_workspaces: { workspace_id: workspace_id })
     end
 
     scope
-  end
-
-  def current_model
-    ENV.fetch("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
   end
 end

@@ -14,10 +14,12 @@ class ProcessDocumentJobTest < ActiveJob::TestCase
     @document.update_columns(status: "pending", file_checksum: nil)
   end
 
-  test "processes document and creates chunks" do
-    ProcessDocumentJob.perform_now(@document.id)
+  test "extracts document, creates chunks, and advances to embedding" do
+    assert_enqueued_with(job: EmbedDocumentJob, args: [ @document.id ]) do
+      ProcessDocumentJob.perform_now(@document.id)
+    end
     @document.reload
-    assert_equal "processed", @document.status
+    assert_equal "embedding", @document.status
     assert @document.chunk_count > 0, "Expected chunk_count > 0"
     assert_not_nil @document.processed_at
     assert_not_nil @document.file_checksum
@@ -27,29 +29,26 @@ class ProcessDocumentJobTest < ActiveJob::TestCase
 
   test "skips if document already processed with same checksum" do
     checksum = @document.file.blob.checksum
-    @document.update_columns(status: "processed", file_checksum: checksum)
+    @document.update_columns(status: "ready", file_checksum: checksum)
 
     assert_no_difference -> { @document.document_chunks.count } do
       ProcessDocumentJob.perform_now(@document.id)
     end
-    # status should remain processed, not re-set to processing
-    assert_equal "processed", @document.reload.status
+    assert_equal "ready", @document.reload.status
   end
 
   test "marks document as failed on extraction error" do
-    original_new = Extraction::DocumentExtractor.method(:new)
     broken = Object.new
     def broken.for(_blob) = raise(RuntimeError, "boom")
-    Extraction::DocumentExtractor.define_singleton_method(:new) { broken }
+    job = ProcessDocumentJob.new(@document.id)
+    job.define_singleton_method(:extractor_for) { |blob| broken.for(blob) }
 
-    ProcessDocumentJob.perform_now(@document.id)
+    job.perform_now
 
     assert_equal "failed", @document.reload.status
     # Error message is sanitized to a user-friendly string (raw "boom" is in logs only)
     assert @document.error_message.present?
     assert_not_equal "boom", @document.error_message
-  ensure
-    Extraction::DocumentExtractor.define_singleton_method(:new, &original_new)
   end
 
   test "discards job when document does not exist" do

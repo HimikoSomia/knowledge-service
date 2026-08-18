@@ -15,45 +15,43 @@ class EmbedDocumentJob < ApplicationJob
   queue_as :embedding
 
   discard_on ActiveRecord::RecordNotFound
-  discard_on Embedding::EmbeddingService::ConfigurationError
-  discard_on Embedding::EmbeddingService::InvalidInputError
-  retry_on  Embedding::EmbeddingService::RateLimitError, wait: :polynomially_longer, attempts: 10
-  retry_on  Embedding::EmbeddingService::ServiceError,   wait: :polynomially_longer, attempts: 5
+  discard_on Embedding::OpenAiEmbeddingService::ConfigurationError
+  discard_on Embedding::OpenAiEmbeddingService::InvalidInputError
+  retry_on  Embedding::OpenAiEmbeddingService::RateLimitError, wait: :polynomially_longer, attempts: 10
+  retry_on  Embedding::OpenAiEmbeddingService::ServiceError,   wait: :polynomially_longer, attempts: 5
   retry_on  StandardError,                               wait: :polynomially_longer, attempts: 3
 
   def perform(document_id)
     document = Document.find(document_id)
+    service = embedding_service
 
-    # Skip if already fully embedded with the current model.
-    return if document.embedding_embedded?
+    return if document.ready? && chunks_needing_embedding(document, service).none?
 
-    unless document.processed?
+    unless document.processed_at?
       Rails.logger.warn do
-        "EmbedDocumentJob: document #{document_id} is not in 'processed' state " \
-        "(#{document.status}) — skipping"
+        "EmbedDocumentJob: document #{document_id} has not been extracted — skipping"
       end
       return
     end
 
-    service = Embedding::OpenAiEmbeddingService.new
+    unless document.document_chunks.exists?
+      document.mark_processed!
+      return
+    end
 
     unless service.configured?
       Rails.logger.warn "EmbedDocumentJob: OPENAI_API_KEY not configured — skipping document #{document_id}"
-      document.update_columns(embedding_status: "not_configured")
+      document.mark_processed!
       return
     end
 
     document.mark_embedding!
 
-    chunks_to_embed = document.document_chunks
-      .where(embedding: nil)
-      .or(document.document_chunks.where.not(embedding_model: service.model))
-      .order(:chunk_index)
-      .to_a
+    chunks_to_embed = chunks_needing_embedding(document, service).order(:chunk_index).to_a
 
     if chunks_to_embed.empty?
       Rails.logger.info "EmbedDocumentJob: document #{document_id} — all chunks already embedded"
-      document.mark_embedded!
+      document.mark_ready!
       return
     end
 
@@ -65,21 +63,33 @@ class EmbedDocumentJob < ApplicationJob
     embed_batches(document, chunks_to_embed, service)
 
     # Verify nothing was left behind.
-    remaining = document.document_chunks.where(embedding: nil).count
+    remaining = chunks_needing_embedding(document, service).count
     if remaining > 0
       raise "EmbedDocumentJob: #{remaining} chunks still lack embeddings after processing " \
             "document #{document_id} — will retry"
     end
 
-    document.mark_embedded!
+    document.mark_ready!
     Rails.logger.info "EmbedDocumentJob: document #{document_id} fully embedded (#{document.chunk_count} chunks)"
   rescue => e
     friendly = log_and_friendly_message(e, context: "document #{document_id} embedding")
-    document&.mark_embedding_failed!(friendly)
+    document&.mark_failed!(friendly)
     raise
   end
 
   private
+
+  def embedding_service
+    Embedding::OpenAiEmbeddingService.new
+  end
+
+  def chunks_needing_embedding(document, service)
+    chunks = document.document_chunks
+    chunks
+      .where(embedding: nil)
+      .or(chunks.where(embedding_model: nil))
+      .or(chunks.where.not(embedding_model: service.model))
+  end
 
   def embed_batches(document, chunks, service)
     start_time = Time.current

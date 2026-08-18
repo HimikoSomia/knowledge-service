@@ -5,59 +5,93 @@ class EnrichDocumentJobTest < ActiveJob::TestCase
     @user = users(:one)
     @document = @user.documents.new(title: "Enrich Test")
     @document.file.attach(
-      io:           File.open(file_fixture("sample.txt")),
-      filename:     "sample.txt",
+      io: File.open(file_fixture("sample.txt")),
+      filename: "sample.txt",
       content_type: "text/plain"
     )
     @document.save!
-    @document.update_columns(status: "processed", enrichment_status: "pending")
+    @document.update_columns(status: "enriching", processed_at: Time.current)
   end
 
-  test "marks not_applicable when document has no image_ref sections" do
-    @document.update_columns(extracted_content: { "sections" => [], "raw_text" => "hello", "metadata" => {} })
-    EnrichDocumentJob.perform_now(@document.id)
-    assert_equal "not_applicable", @document.reload.enrichment_status
+  test "completes processing when there are no image refs or chunks" do
+    @document.update_columns(extracted_content: { "sections" => [], "raw_text" => "", "metadata" => {} })
+
+    assert_no_enqueued_jobs only: EmbedDocumentJob do
+      perform_job(unconfigured_vision_service)
+    end
+
+    assert_equal "processed", @document.reload.status
   end
 
-  test "marks not_applicable when vision service is not configured" do
-    ENV.delete("OPENAI_API_KEY")
-    @document.update_columns(extracted_content: {
-      "sections" => [ { "type" => "image_ref", "page_number" => 1, "image_index" => 0 } ],
-      "raw_text" => "",
-      "metadata" => {}
-    })
-    EnrichDocumentJob.perform_now(@document.id)
-    assert_equal "not_applicable", @document.reload.enrichment_status
+  test "hands existing chunks to embedding when vision is not configured" do
+    create_core_chunk
+    add_image_ref
+
+    assert_enqueued_with(job: EmbedDocumentJob, args: [ @document.id ]) do
+      perform_job(unconfigured_vision_service)
+    end
+
+    assert_equal "embedding", @document.reload.status
   end
 
-  test "marks not_applicable when vision service raises NotImplementedError" do
-    @document.update_columns(extracted_content: {
-      "sections" => [ { "type" => "image_ref", "page_number" => 1, "image_index" => 0 } ],
-      "raw_text" => "",
-      "metadata" => {}
-    })
+  test "stores image descriptions before handing the document to embedding" do
+    create_core_chunk
+    add_image_ref
+    vision = Object.new
+    def vision.configured? = true
+    def vision.describe_image_from_document(_, _) = "A chart showing quarterly growth."
 
-    original_new = Enrichment::OpenAiVisionService.method(:new)
-    stubbed = Object.new
-    def stubbed.configured? = true
-    def stubbed.describe_image_from_document(_, _) = raise(NotImplementedError, "not ready")
+    assert_enqueued_with(job: EmbedDocumentJob, args: [ @document.id ]) do
+      perform_job(vision)
+    end
 
-    Enrichment::OpenAiVisionService.define_singleton_method(:new) { stubbed }
+    @document.reload
+    assert_equal "embedding", @document.status
+    assert_not_nil @document.enriched_at
+    assert_equal 2, @document.document_chunks.count
+    assert_equal "A chart showing quarterly growth.", @document.document_chunks.order(:chunk_index).last.content
+  end
 
-    EnrichDocumentJob.perform_now(@document.id)
-    assert_equal "not_applicable", @document.reload.enrichment_status
-  ensure
-    Enrichment::OpenAiVisionService.define_singleton_method(:new, &original_new)
+  test "skips a document that is already ready" do
+    @document.update_columns(status: "ready")
+
+    assert_no_enqueued_jobs do
+      perform_job(unconfigured_vision_service)
+    end
+
+    assert_equal "ready", @document.reload.status
   end
 
   test "discards job when document does not exist" do
     assert_nothing_raised { EnrichDocumentJob.perform_now(0) }
   end
 
-  test "skips enrichment if already enriched" do
-    @document.update_columns(enrichment_status: "enriched")
-    # Job should return early without changing status
-    EnrichDocumentJob.perform_now(@document.id)
-    assert_equal "enriched", @document.reload.enrichment_status
+  private
+
+  def add_image_ref
+    @document.update_columns(extracted_content: {
+      "sections" => [
+        { "type" => "image_ref", "source_type" => "uploaded", "page_number" => 1, "image_index" => 0 }
+      ],
+      "raw_text" => "",
+      "metadata" => {}
+    })
+  end
+
+  def create_core_chunk
+    @document.document_chunks.create!(chunk_index: 0, content: "Existing text", metadata: {})
+    @document.update_columns(chunk_count: 1)
+  end
+
+  def unconfigured_vision_service
+    Object.new.tap do |service|
+      service.define_singleton_method(:configured?) { false }
+    end
+  end
+
+  def perform_job(service)
+    job = EnrichDocumentJob.new(@document.id)
+    job.define_singleton_method(:vision_service) { service }
+    job.perform_now
   end
 end

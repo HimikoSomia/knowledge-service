@@ -110,4 +110,3 @@ class Extraction::PdfExtractor < Extraction::BaseExtractor
     1
   end
 end
-
