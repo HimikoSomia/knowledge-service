@@ -1,311 +1,245 @@
 # AGENTS.md
 
-This file is the operating guide for AI agents working in this repository. Read it before changing Rails code, views, migrations, assets, tests, credentials, deployment config, or project structure.
+This is the repository-wide operating guide for AI agents working on `knowledge-service`. It applies to Rails code, views, jobs, services, migrations, assets, tests, credentials, deployment configuration, documentation, generated files, and project structure.
 
-## Application Overview
+A nested `AGENTS.md` adds instructions for its subtree. More specific local instructions win for local concerns, but they may not silently weaken the root requirements for authentication, ownership, data integrity, secret handling, verification, database safety, or protection of user work.
 
-`knowledge-service` is a Ruby on Rails application for organizing workspaces, documents, document chunks, and knowledge-service workflows. It uses Rails' conventional MVC structure, session-based authentication, PostgreSQL persistence, Active Storage, Tailwind CSS, Hotwire, and Rails-native background/cache/cable adapters.
+## Must Read For Every Change
 
-Prefer Rails conventions over custom architecture. Keep changes small, coherent, and aligned with the existing app.
+Use this checklist for routine work. Read only the task-specific files relevant to the requested change.
 
-## Technology Stack
+- Inspect the relevant code, tests, documentation, and current repository patterns; check `git status --short` before significant edits.
+- Preserve public behavior, authentication, ownership boundaries, data integrity, secrets, and unrelated user work unless the request explicitly changes them.
+- Prefer the smallest Rails-conventional implementation that is correct. Do not introduce speculative abstractions, dependencies, client-side state, concurrency, or optimization.
+- Keep request handling in controllers, persistence rules in models, multi-step workflows and external integrations in services, presentation in views/helpers, and schema changes in migrations.
+- Scope every browser operation on user-owned data through `Current.user`; resolve submitted record IDs through user-scoped associations.
+- Add focused tests for behavior changes and update related routes, views, jobs, models, migrations, fixtures, configuration examples, or documentation when required.
+- Run the most relevant verification available and report exactly what changed, what ran, and what remains unverified.
+- Never read, print, summarize, or copy real secret values unless the user explicitly requests that exact inspection.
 
-- Runtime/framework: Ruby on Rails 8.1.x.
-- Database: PostgreSQL through Active Record.
-- Authentication: Rails generated session authentication with `Current.session` / `Current.user`, signed `session_id` cookie, `has_secure_password`, and password reset tokens.
-- Assets: Propshaft, importmap-rails, Turbo, Stimulus, Tailwind CSS, DaisyUI.
-- Files: Active Storage, with AWS S3 support through `aws-sdk-s3`.
-- Background/cache/cable: Solid Queue, Solid Cache, and Solid Cable.
-- Vector/search support: `neighbor` and the `vector` database extension.
-- Deployment: Docker, Kamal, Puma, Thruster.
-- Local env loading: `dotenv-rails` in development/test.
-- Quality/security tools: Rails tests, RuboCop Omakase, Brakeman, bundler-audit.
+Ask a focused question when an assumption would materially affect public behavior, authentication, ownership, data integrity, destructive behavior, or architecture. Otherwise use the smallest repository-backed assumption and state it when relevant.
 
-## Common Commands
+## Application And Repository Map
 
-Run commands from the repository root unless noted otherwise.
-
-```bash
-# Install dependencies, prepare the database, and start dev services
-bin/setup
-
-# Start Rails and Tailwind watcher via Foreman/Procfile.dev
-bin/dev
-
-# Prepare or migrate the database
-bin/rails db:prepare
-bin/rails db:migrate
-
-# Run tests
-bin/rails test
-bin/rails test test/models/workspace_test.rb
-
-# Run lint/security checks
-bin/rubocop
-bin/brakeman
-bin/bundler-audit
-
-# Run the app's CI script when broader verification is needed
-bin/ci
-
-# Rebuild Tailwind output after changing classes in views/helpers/components
-bin/rails tailwindcss:build
-```
-
-If a command cannot run because PostgreSQL, gems, a browser driver, network access, or credentials are unavailable, state that clearly in the final response. Do not claim verification that was not performed.
-
-## Directory Guide
+`knowledge-service` is a Ruby on Rails 8.1 application for organizing user-owned workspaces and uploaded documents. It extracts content into searchable chunks, optionally enriches images with OpenAI Vision, creates OpenAI embeddings, and provides workspace-scoped semantic search.
 
 ```text
-app/controllers/             Request handling, authentication gates, redirects, strong params.
-app/controllers/concerns/    Shared controller behavior, especially authentication.
-app/models/                  Active Record models, associations, validations, query scopes.
-app/services/                Business workflows that do not belong directly in controllers/models.
-app/views/                   ERB templates, layouts, partials, forms, mailer views.
-app/helpers/                 View helpers only; avoid business logic here.
-app/javascript/              Stimulus controllers and importmap entrypoint.
-app/assets/tailwind/         Tailwind source and DaisyUI plugin files.
-app/assets/builds/           Generated asset output; rebuild rather than hand-edit.
-config/                      Routes, environments, database, storage, deploy, importmap, initializers.
-db/migrate/                  Active Record migrations.
-db/schema.rb                 Schema snapshot generated by Rails.
-test/                        Minitest tests, fixtures, controller/model tests, test helpers.
+Browser -> Router -> Controller -> Model / Service -> PostgreSQL / Active Storage / provider
+                                      |
+                                      -> Active Job -> extraction -> enrichment -> embedding
 ```
 
-## Where To Look First
+The application uses session authentication through `Current.session` / `Current.user`, PostgreSQL with pgvector through `neighbor`, Active Storage, Solid Queue/Cache/Cable, Hotwire, Stimulus, Tailwind CSS, DaisyUI, Propshaft, importmap-rails, Docker, Kamal, Puma, and Thruster.
 
-| Task | Start here |
+```text
+app/controllers/             Authentication gates, scoped loading, request handling, redirects.
+app/controllers/concerns/    Shared controller behavior, especially authentication.
+app/models/                  Active Record associations, validations, scopes, persistence behavior.
+app/services/                Extraction, chunking, enrichment, embedding, retrieval, workflows.
+app/jobs/                    Active Job orchestration and document-processing stages.
+app/views/                   ERB pages, layouts, partials, forms, and mailer views.
+app/helpers/                 Presentation helpers only.
+app/javascript/              Stimulus controllers and importmap entrypoint.
+app/assets/tailwind/         Tailwind source and DaisyUI plugin files.
+app/assets/builds/           Generated assets; rebuild rather than hand-edit.
+config/                      Routes, environments, database, storage, deploy, importmap, initializers.
+db/migrate/                  Additive Active Record migrations.
+db/schema.rb                 Generated application schema snapshot.
+db/*_schema.rb               Rails-managed Solid Cable/Cache/Queue schemas.
+test/                        Minitest tests, fixtures, helpers, and fixture files.
+```
+
+Keep new code inside these boundaries unless a larger structural change is explicitly requested.
+
+## Task-Specific Guidance
+
+The root checklist always applies. Combine rows when a change spans areas.
+
+| Task area | Inspect first |
 | --- | --- |
-| Routes or REST resource shape | `config/routes.rb` |
-| Authentication/session behavior | `app/controllers/concerns/authentication.rb`, `app/controllers/sessions_controller.rb`, `app/models/session.rb`, `app/models/current.rb` |
-| Workspace behavior | `app/controllers/workspaces_controller.rb`, `app/models/workspace.rb`, `app/services/workspace_service.rb`, related views/tests |
-| Document behavior | `app/controllers/documents_controller.rb`, `app/models/document.rb`, `app/models/document_chunk.rb`, related views/tests |
-| Password reset flow | `app/controllers/passwords_controller.rb`, `app/mailers/passwords_mailer.rb`, password views/tests |
-| Layout, sidebar, navbar, page titles | `app/views/layouts/`, relevant page views, `content_for` usage |
-| Styling and UI classes | ERB views plus `app/assets/tailwind/application.css`; rebuild with `bin/rails tailwindcss:build` |
-| Database schema | `db/schema.rb`, `db/migrate/`, affected models/tests |
-| Storage/S3 | `config/storage.yml`, Active Storage attachments, `app/services/aws/s3_service.rb` |
-| Deployment | `Dockerfile`, `config/deploy.yml`, `.kamal/`, `.dockerignore` |
+| Routes, REST shape, status codes, or redirects | `config/routes.rb`, affected controller, views, and controller tests |
+| Authentication, sessions, password reset, or public access | `app/controllers/concerns/authentication.rb`, session/password controllers, `app/models/current.rb`, `app/models/session.rb`, related tests |
+| Workspaces, ownership, or workspace search | Workspace controller/model/service, retrieval service, related views and tests |
+| Documents, uploads, or workspace assignment | Document controller/model, `DocumentWorkspace`, Active Storage attachment behavior, related views and tests |
+| Extraction, OCR, chunking, or supported file types | `app/services/extraction/`, `app/services/chunking/`, `ProcessDocumentJob`, document model, fixtures, README, related tests |
+| Enrichment, embeddings, vector search, or processing lifecycle | Enrichment/embedding/retrieval services, all document-processing jobs, document/chunk models, vector migrations/schema, `.env.example`, README, related tests |
+| Background jobs, retries, or recurring work | `app/jobs/`, `config/queue.yml`, `config/recurring.yml`, affected models/services, job tests |
+| Database schema, associations, indexes, or constraints | `db/schema.rb`, all relevant migration history, affected models, fixtures, queries, and tests |
+| Storage or S3 | `app/models/document.rb`, `config/storage.yml`, affected environment configuration, Active Storage migrations, upload tests, README |
+| Layout, navigation, page titles, or styling | `app/views/layouts/`, affected views/helpers, `app/assets/tailwind/application.css` |
+| Stimulus or browser behavior | `app/javascript/controllers/`, connected ERB data attributes, Turbo behavior |
+| Runtime configuration or deployment | Consuming code, `.env.example`, README, relevant environment files, `Dockerfile`, `config/deploy.yml`, `.kamal/` |
 
-## Rails Architecture
+## Global Engineering Rules
 
-Follow Rails' default boundaries:
+These rules are mandatory unless an explicit user requirement authorizes a compatible change.
 
-- Controllers should stay thin: load scoped records, authorize/require authentication through existing concerns, call models/services, handle success/failure, and render or redirect.
-- Models should own associations, validations, scopes, callbacks only when justified, and persistence-related behavior.
-- Services should be plain Ruby objects for multi-step workflows or external integrations. Do not create a service for simple CRUD that Active Record already expresses clearly.
-- Views should render state prepared by controllers and use helpers/partials for presentation reuse. Avoid queries or business workflows in views.
-- Helpers should format and present data; they should not mutate database state or call external services.
-- Migrations should express schema changes; do not manually edit `db/schema.rb` except when resolving generated output conflicts.
+### Decision Order
 
-Prefer Rails naming and folder conventions. Add new directories only when the existing Rails structure cannot express the problem cleanly.
+When several implementations are valid, prefer them in this order:
 
-## Authentication And Current User
+1. Correctness.
+2. Authentication, ownership, security, and data integrity.
+3. Rails conventions, readability, and maintainability.
+4. Simplicity and operational clarity.
+5. Measured performance appropriate to expected scale.
+6. Architectural novelty.
 
-The app uses a Rails session authentication concern:
+Performance may move higher only for a demonstrated bottleneck, clearly unsuitable query/algorithm, or documented resource constraint. Keep necessary complexity local and explain it.
+
+### Rails Boundaries
+
+- Controllers stay thin: authenticate, load scoped records, validate permitted input, invoke models/services, and render or redirect.
+- Models own associations, validations, composable scopes, and persistence-related behavior. Keep callbacks small and predictable.
+- Services are plain Ruby objects for external integrations or multi-step workflows. Do not create services for simple CRUD that Active Record already expresses clearly.
+- Jobs orchestrate retryable asynchronous work through `ApplicationJob`; keep business logic in models/services where it can be tested directly.
+- Views render prepared state. Helpers format or present data and must not mutate records or call external services.
+- Use Stimulus for small explicit browser behaviors and prefer Turbo/server-rendered HTML over custom client-side state.
+- Use narrow abstractions only when they create a real boundary or test seam. Add new directories only when Rails' existing structure cannot express the problem cleanly.
+
+### Authentication And Ownership
 
 - `ApplicationController` includes `Authentication`, so actions require authentication by default.
-- Use `allow_unauthenticated_access` only for public actions such as login/password reset.
-- `Current.session` and `Current.user` represent the signed-cookie session context.
-- Scope user-owned records through `Current.user` where appropriate, for example `Current.user.workspaces`.
-- Do not trust client-provided `user_id`; derive ownership from `Current.user`.
-- Keep auth messages generic. Do not reveal whether an email exists during login or password reset flows.
-- Do not log raw passwords, session IDs, reset tokens, cookies, or full request params containing secrets.
+- Use `allow_unauthenticated_access` only for intentionally public actions such as login and password reset.
+- Derive ownership from `Current.user`; never trust a client-provided `user_id`.
+- Load user-owned records through associations such as `Current.user.workspaces.find(params[:id])`, not global model lookups.
+- Resolve submitted association IDs through the current user's scoped associations to prevent IDOR.
+- Cross-user resources must normally produce the same not-found response as missing resources.
+- Every owned-resource behavior change requires a two-user isolation test at the controller, service, or query boundary.
+- Background jobs may load records globally by ID because they run outside a browser session, but user ownership must remain intact in every related query and association change.
+- Keep authentication messages generic. Do not reveal whether an email exists during login or password reset.
+- Never log raw passwords, reset tokens, session IDs, cookies, authorization headers, or unfiltered secret-bearing parameters.
 
-When adding authenticated resources, make the ownership boundary explicit in controllers, models, tests, and fixtures.
+### Models, Queries, And Data Integrity
 
-## Database And Migrations
+- Use clear Active Record associations and appropriate `dependent:` behavior.
+- Put application validations near the model rule and add database constraints when correctness must hold under concurrency.
+- Add indexes for foreign keys, uniqueness, and demonstrated frequent lookups.
+- Avoid N+1 queries with `includes`, `preload`, or appropriate scoped queries.
+- Multi-record business outcomes should be transactional when partial persistence would be invalid.
+- Keep lifecycle transitions explicit. Do not bypass validations or callbacks with `update_columns`, bulk writes, or direct SQL without inspecting and preserving the intended invariants.
+- When changing associations, verify models, foreign keys, delete behavior, migrations, schema, fixtures, and tests agree.
 
-Use Active Record migrations for schema changes:
+### Database And Migrations
 
-1. Inspect `db/schema.rb`, existing migrations, affected models, and fixtures first.
-2. Generate or add a new migration; do not edit an already-applied migration unless the user explicitly requests migration history cleanup.
-3. Keep migrations reversible when practical, or use `reversible` / `up` and `down` with a clear reason.
-4. Add indexes and constraints for foreign keys, uniqueness, and frequent lookups when the model needs them.
-5. Update models, controllers, fixtures, factories/test data, and views in the same change when behavior depends on the schema.
-6. Run `bin/rails db:migrate` and relevant tests when a database is available.
+- Inspect `db/schema.rb`, all relevant migration history, existing rows/fixtures, affected models, and dependent queries before editing.
+- Add a new migration; do not change an already-applied migration unless the user explicitly authorizes migration-history cleanup.
+- Preserve existing data unless destructive behavior is explicitly requested.
+- Keep migrations reversible when practical. Use `reversible`, `up`/`down`, or an explicit irreversible declaration with a clear reason.
+- Review backfill ordering, defaults, nullability, uniqueness, foreign-key deletion, indexes, locking risk, transaction behavior, and deployment ordering.
+- Do not manually edit generated schema files. Run the appropriate Rails task and inspect the generated diff.
+- Keep Rails-managed Solid Queue, Cache, and Cable schemas separate from application migrations.
+- This application uses pgvector with 1,536-dimension document embeddings. Changes to vector dimensions must coordinate the migration, provider request, validation, configuration examples, tests, and README.
+- Run migrations only against an explicitly selected local development or isolated test database. Never run migration checks against production, staging, or an unspecified external database.
 
-This app uses PostgreSQL and includes Active Storage tables plus the `neighbor` vector extension. Be careful with vector column dimensions and generated schema output.
+### Document Processing, Jobs, And Providers
 
-## Models And Active Record
+- Preserve the documented processing lifecycle and coordinate status changes across `Document`, processing jobs, services, views, and tests.
+- Jobs must be safe under retries and duplicate delivery. Test idempotency, failure state, retry/discard behavior, and lifecycle transitions when those behaviors change.
+- Extraction/chunk replacement and other multi-write stages must not leave misleading partial state.
+- Use Active Storage APIs for files; do not manually construct storage paths.
+- Treat native OCR/Poppler tools as optional runtime dependencies unless deployment requirements explicitly change.
+- Stub or fake OpenAI, storage, mail, and other providers in tests. Tests must never require real credentials, make real provider calls, or mutate external resources.
+- Keep provider errors safe for users and logs; do not expose request payloads, document contents, credentials, or raw sensitive responses.
+- Preserve workspace and user scoping in semantic-search queries and add isolation coverage when retrieval behavior changes.
 
-Prefer clear Active Record associations and validations:
+### Controllers, Views, And Frontend
 
-- Use `belongs_to`, `has_many`, `has_one_attached`, and `dependent:` options consistently.
-- Add model validations close to the data rule; add database constraints when the rule must hold under concurrency.
-- Avoid N+1 queries on list pages. Use `includes`, `preload`, or scoped queries where needed.
-- Keep callbacks small and predictable. Prefer explicit service objects for workflows with external IO, background jobs, or multiple records.
-- Use named scopes for reusable query fragments; keep scopes composable.
+- Prefer RESTful `resources` / `resource` routes. Before adding a custom action, consider a nested resource or separate controller.
+- Use strong parameters with `params.expect` or `require(...).permit(...)`, following the surrounding controller style.
+- Render validation failures with `:unprocessable_entity` and use `:see_other` for destructive redirects when appropriate for Turbo.
+- Prefer Rails form/path helpers over hardcoded URLs and use existing Turbo-compatible method attributes.
+- Use `content_for` for page-specific layout content and extract repeated presentation into partials.
+- Keep UI changes consistent with existing Tailwind/DaisyUI patterns.
+- Do not hand-edit generated Tailwind output. Change templates or Tailwind source, then rebuild it.
+- Avoid adding npm or other frontend tooling unless there is a concrete need and the project does not already provide the capability.
 
-When adding associations, verify the backing table, foreign key, migration, fixture, and test coverage all agree.
+### Configuration, Secrets, And User Work
 
-## Controllers And Routing
-
-Use RESTful routes where possible:
-
-- Prefer `resources` / `resource` in `config/routes.rb`.
-- Use strong params (`params.expect` or `params.require(...).permit(...)`, matching the existing controller style).
-- On validation failures, render with an appropriate status such as `:unprocessable_entity` when adding or updating modern controller code.
-- Redirect destructive actions with `status: :see_other` when appropriate for Turbo/browser behavior.
-- Keep record lookup scoped. For user-owned data, prefer `Current.user.records.find(params[:id])` over `Model.find(params[:id])`.
-
-If adding non-CRUD actions, consider whether a nested resource or separate controller would be more Rails-like than a custom member action.
-
-## Views, Layouts, And Frontend
-
-The app uses ERB layouts/partials, Tailwind CSS, DaisyUI, Turbo, and Stimulus.
-
-- Put shared chrome in `app/views/layouts/` partials such as `_menu.html.erb` and `_navbar.html.erb`.
-- Use `content_for` in views for page-specific layout content such as titles:
-
-  ```erb
-  <% content_for :title, "Workspaces" %>
-  ```
-
-- Prefer Rails form helpers and path helpers over hardcoded URLs.
-- Keep ERB readable: extract repeated presentation into partials rather than embedding large conditionals.
-- Use Turbo-friendly links/buttons. For non-GET actions, use Rails/Turbo method data attributes already used by the app.
-- Do not hand-edit generated Tailwind output. Change templates or Tailwind source, then run `bin/rails tailwindcss:build`.
-- Keep UI changes consistent with the existing DaisyUI/Tailwind patterns.
-
-## JavaScript
-
-Use Stimulus for page behavior that needs JavaScript:
-
-- Put controllers under `app/javascript/controllers`.
-- Keep controllers small and connected to explicit `data-controller`, `data-*-target`, and `data-*-value` attributes.
-- Prefer Turbo and server-rendered HTML before adding custom client-side state.
-- Avoid adding npm/package-manager tooling unless the project already requires it or the user explicitly asks.
-
-## Background Jobs, Mailers, And Storage
-
-- Use `ApplicationJob` and Active Job for asynchronous work.
-- Use `deliver_later` for mail that should not block web requests.
-- Keep mailer side effects minimal and test previews/outputs where practical.
-- Use Active Storage APIs for uploads and attachments; do not manually construct storage paths.
-- Keep S3 credentials in environment variables or Rails credentials, never in code or fixtures.
-
-## Configuration And Secrets
-
-Treat local runtime files as sensitive:
-
-- Do not read, print, summarize, or copy real `.env` values unless the user explicitly asks for that specific inspection.
-- `.env` and `config/master.key` must not be committed.
-- Use `.env.example` for documented variable names and placeholder values only.
-- `config/credentials.yml.enc` may be committed; `config/master.key` must stay local/secret.
-- Prefer `ENV.fetch` for required runtime configuration and safe defaults only for local development.
-- Never hardcode passwords, tokens, database URLs, AWS keys, OpenAI keys, session IDs, cookies, or credential-like values.
-
-When reviewing commits, check ignored/local files and secret-looking diffs before recommending a commit.
+- Do not read, print, summarize, or copy values from real `.env` files or decrypted credentials unless explicitly asked to inspect those exact values.
+- `.env` and `config/master.key` must not be committed. `config/credentials.yml.enc` may be committed.
+- Use `.env.example` for variable names and non-secret placeholders only.
+- Prefer `ENV.fetch` for required runtime configuration and safe documented defaults where optional behavior is intentional.
+- Never hardcode passwords, tokens, database URLs, AWS/OpenAI keys, session values, cookies, personal data, or production identifiers.
+- Configuration changes must update consuming code, `.env.example`, README configuration, tests, and deployment/environment configuration where applicable.
+- Keep documentation truthful and identify placeholders or unverified behavior explicitly.
+- Protect unrelated user changes. Do not combine requested work with cleanup, formatting, dependency churn, generated noise, or package reshuffling.
+- New gems or external services require a concrete need and must not duplicate an existing capability.
+- Ask before destructive file/database operations, migration rollback, history rewrite, or intentional modification of real external resources.
 
 ## Testing And Verification
 
-Default verification:
+Every behavior change needs focused tests at the lowest useful layer.
+
+- Model changes: validations, associations, lifecycle methods, and edge cases.
+- Controller changes: success, validation failure, authentication, authorization, response status, and redirect/render behavior.
+- Ownership changes: two-user isolation and submitted foreign-ID coverage.
+- Transactional changes: rollback or partial-failure coverage where practical.
+- Job changes: enqueue behavior, retries/discards, idempotency, lifecycle transitions, and failure state.
+- Provider changes: fakes/stubs and safe error mapping; no credentials or live calls.
+- Retrieval changes: user/workspace isolation, embedding-model compatibility, and missing-configuration behavior.
+- Migration/query changes: PostgreSQL verification against an explicitly selected isolated database when available.
+- View/asset changes: relevant rendering tests plus a Tailwind rebuild when class discovery/output changes.
+
+Run focused tests while iterating, then the full suite when available:
 
 ```bash
+RAILS_ENV=test bin/rails db:prepare
+bin/rails test test/models/document_test.rb
+bin/rails test test/controllers/workspaces_controller_test.rb
 bin/rails test
 ```
 
-Use focused tests for narrow changes:
-
-```bash
-bin/rails test test/models/document_test.rb
-bin/rails test test/controllers/workspaces_controller_test.rb
-```
-
-For broader or riskier changes, also run:
+For broader or riskier changes, run the applicable checks:
 
 ```bash
 bin/rubocop
 bin/brakeman
 bin/bundler-audit
+bin/rails tailwindcss:build
 bin/ci
 ```
 
-Testing guidance:
+Documentation-only changes require diff, path, link, and Markdown inspection rather than Rails tests unless the documentation makes claims that require runtime verification.
 
-- Add or update tests for changed behavior, especially models, controllers, authentication, permissions, and migrations.
-- Keep fixtures realistic but free of secrets.
-- Use test helpers under `test/test_helpers/` when repeated login/session setup appears.
-- If a database or browser dependency prevents verification, report the limitation and what was checked instead.
+If PostgreSQL, gems, native tools, browser support, network access, or credentials prevent a check, run all other relevant checks and report the exact gap. Never claim tests, migrations, asset builds, or runtime behavior were verified unless they actually were.
 
-## Change Discipline
+## Common Commands
 
-- Check `git status --short` before significant edits.
-- Protect user work. Do not revert or overwrite unrelated local changes.
-- Read surrounding files before editing.
-- Prefer the smallest correct change that follows Rails conventions.
-- Avoid broad refactors, dependency churn, formatting sweeps, or generated-file noise unless required.
-- Update related surfaces together: routes, controller, model, view, migration, fixtures, tests, docs.
-- Preserve existing public behavior unless the task asks to change it.
-- Do not introduce a new gem, external service, or architectural layer without a clear need.
+Run from the repository root. Commands that prepare or migrate databases must target an intentionally selected environment.
 
-## Review Tasks
+```bash
+# Install dependencies, prepare the local development databases, and start development services.
+bin/setup
 
-When asked to review, use a code-review posture. Lead with findings ordered by severity and include file/line references where possible. Prioritize:
+# Start Rails and the Tailwind watcher.
+bin/dev
 
-- Authentication, authorization, session, or secret-handling risks.
-- Data leaks across users or unscoped Active Record queries.
-- Migration, constraint, data-loss, or schema consistency risks.
-- Controller behavior regressions, incorrect status codes, or Turbo-unfriendly redirects.
-- Missing validations, missing indexes, or N+1 queries.
-- Broken view helpers, route helpers, or generated asset assumptions.
+# Start the Solid Queue worker when it is not running inside Puma.
+bin/jobs
+
+# Prepare or migrate the isolated test database.
+RAILS_ENV=test bin/rails db:prepare
+RAILS_ENV=test bin/rails db:migrate
+
+# Run the full test suite and project CI.
+bin/rails test
+bin/ci
+```
+
+## Working Method And Reviews
+
+For implementation, inspect first, read the matching task-specific context, identify acceptance criteria for non-trivial work, make the smallest correct change, update related surfaces, verify, and summarize changed files and remaining risk.
+
+For review, lead with findings ordered by severity and include file/line references where possible. Prioritize:
+
+- Authentication, authorization, ownership, session, or secret-handling risks.
+- Cross-user data leaks or unscoped Active Record queries.
+- Migration, constraint, data-loss, lifecycle, transaction, or schema consistency risks.
+- Job retry/idempotency problems and unsafe provider behavior.
+- Controller regressions, unsafe errors, incorrect statuses, or Turbo-unfriendly redirects.
+- Missing validations/indexes, N+1 queries, and request/query performance issues.
+- Broken route/view helpers, configuration drift, or generated asset assumptions.
 - Missing or weak tests.
 
-If no issues are found, say that clearly and mention any meaningful test or runtime coverage gaps.
-
-## Communication
-
-- Keep responses concise and specific.
-- Summarize what changed, where it changed, what was verified, and any remaining risk.
-- Do not claim tests, migrations, builds, or runtime behavior were verified unless they actually were.
-- Ask a focused question only when a reasonable assumption would be risky; otherwise proceed with the obvious Rails-conventional path.
-
-## Agent Guidelines
-
-These guidelines apply to every AI agent working in this repository, regardless of mode or workflow label, including plan, ask, debug, review, implementation, refactor, and documentation work. A mode may change how much action the agent takes, but it must not bypass safety, Rails architecture, verification, or user-work protection rules.
-
-### Primary Behavior
-
-- Inspect first, then act. Read the relevant Rails files before proposing or editing.
-- Prefer the obvious Rails-conventional path when the request is clear.
-- Ask a focused question only when a reasonable assumption would be risky.
-- For implementation requests, proceed through code changes and verification when feasible; do not stop at a proposal unless the user asks for one.
-
-### Architecture First
-
-Before implementing:
-
-1. Read the surrounding controller, model, view, service, migration, route, and test context as relevant.
-2. Understand ownership and data flow, especially `Current.user` scoping.
-3. Check existing Rails patterns in this app.
-4. Reuse the current structure before adding abstractions, gems, or directories.
-
-### Always-On Rules
-
-- Read before editing. Inspect the relevant Rails layer and tests before making changes.
-- Preserve the existing architecture. Keep request handling in controllers, persistence rules in models, reusable workflows in services, presentation in views/helpers, and schema changes in migrations.
-- Protect user work. Check `git status --short` before significant edits. Do not revert or overwrite unrelated local changes.
-- Keep security-sensitive code conservative. Follow the Configuration And Secrets rules above for `.env`, credentials, cookies, tokens, logs, and uploads.
-- Keep docs truthful. If a feature is a placeholder or partially implemented, say so clearly.
-
-### Change Discipline
-
-- Make narrow, coherent changes. Avoid broad refactors, dependency churn, generated-file noise, or formatting unrelated files unless required by the task.
-- Update related Rails surfaces together. Route changes often require controller, view, model, fixture, and test updates. Schema changes require migrations, model updates, schema output, fixtures, and tests where relevant.
-- Prefer additive migrations. Add new Active Record migrations for schema changes; do not silently mutate older migrations.
-- Keep user-owned data scoped through `Current.user` unless the route is intentionally global.
-
-### Tooling And Verification
-
-- Use repo-native tools: `bin/rails test`, focused Rails tests, `bin/rubocop`, `bin/brakeman`, `bin/bundler-audit`, `bin/rails db:migrate`, `bin/rails tailwindcss:build`, and `bin/ci` when appropriate.
-- Verify before finalizing with the most relevant checks available for the change.
-- If a check cannot be run because of missing services, tools, network, database state, or user approval, report that limitation plainly.
-- Do not claim migrations, tests, asset builds, security checks, or runtime behavior were verified unless they actually were.
-
-### Communication
-
-- Keep responses concise and specific.
-- Summarize what changed, where it changed, what was verified, and any remaining risk.
-- In review mode, lead with findings before summaries.
-- In planning or ask mode, still follow the safety and architecture rules; do not recommend actions that would violate them.
+If no findings exist, say so and identify meaningful test or runtime coverage gaps. Final responses must state what changed, what was verified, and any remaining manual step without overstating completeness.
