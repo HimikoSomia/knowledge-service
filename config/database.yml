@@ -80,32 +80,17 @@ test:
 # like your database password, in your source code. If your source code is
 # ever seen by anyone, they now have access to your database.
 #
-# Instead, provide the password or a full connection URL as an environment
-# variable when you boot the app. For example:
-#
-#   DATABASE_URL="postgres://myuser:mypass@localhost/somedatabase"
-#
-# If the connection URL is provided in the special DATABASE_URL environment
-# variable, Rails will automatically merge its configuration values on top of
-# the values provided in this file. Alternatively, you can specify a connection
-# URL environment variable explicitly:
-#
-#   production:
-#     url: <%= ENV["MY_APP_DATABASE_URL"] %>
-#
-# Connection URLs for non-primary databases can also be configured using
-# environment variables. The variable name is formed by concatenating the
-# connection name with `_DATABASE_URL`. For example:
-#
-#   CACHE_DATABASE_URL="postgres://cacheuser:cachepass@localhost/cachedatabase"
-#
-# Read https://guides.rubyonrails.org/configuring.html#configuring-a-database
-# for a full overview on how database connection configuration can be specified.
+# Production is intentionally configured with the discrete DB_HOST, DB_PORT,
+# DB_USERNAME, and DB_PASSWORD variables so all four databases use the same
+# PostgreSQL server. Do not also set DATABASE_URL unless intentionally replacing
+# this repository's production database contract.
 #
 production:
   primary: &primary_production
     <<: *default
     database: knowledge_service_production
+    host: <%= ENV.fetch("DB_HOST") %>
+    port: <%= ENV.fetch("DB_PORT", 5432) %>
     username: <%= ENV.fetch("DB_USERNAME") %>
     password: <%= ENV.fetch("DB_PASSWORD") %>
   cache:

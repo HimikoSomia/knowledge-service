@@ -74,7 +74,8 @@ Copy [`.env.example`](.env.example) to `.env`; dotenv loads it in development an
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
-| `DB_HOST` | No | PostgreSQL host; defaults to `localhost`. |
+| `DB_HOST` | Development: no; production: yes | PostgreSQL host. Development defaults to `localhost`; production fails fast when it is absent. |
+| `DB_PORT` | No | PostgreSQL port; defaults to `5432`. |
 | `DB_USERNAME` / `DB_PASSWORD` | Depends | PostgreSQL credentials; production requires both. |
 | `OPENAI_API_KEY` | No | Enables document embeddings, semantic search, and image enrichment. |
 | `OPENAI_EMBEDDING_MODEL` | No | Embedding model; defaults to `text-embedding-3-small`. |
@@ -125,6 +126,15 @@ bin/ci
 
 ## Deployment
 
-The repository includes a production Dockerfile and Kamal configuration. Before deploying, replace the placeholder server and registry settings in [`config/deploy.yml`](config/deploy.yml), configure `RAILS_MASTER_KEY` and database credentials in the deployment secrets, and ensure the production PostgreSQL server provides the `vector` extension. The configured production process runs Solid Queue within Puma (`SOLID_QUEUE_IN_PUMA=true`).
+The repository includes a production Dockerfile and Kamal configuration. Before deploying:
+
+1. Replace the placeholder server and registry settings in [`config/deploy.yml`](config/deploy.yml).
+2. Supply `RAILS_MASTER_KEY`, `DB_HOST`, `DB_USERNAME`, and `DB_PASSWORD` through `.kamal/secrets`. These values are injected as container secrets and must not be committed.
+3. Set `DB_PORT` in the deployment environment when PostgreSQL does not use port `5432`; Kamal passes it as a clear, non-secret variable.
+4. Ensure the PostgreSQL server hosts `knowledge_service_production`, `knowledge_service_production_cache`, `knowledge_service_production_queue`, and `knowledge_service_production_cable`, and provides the `vector` extension.
+
+Production is standardized on these discrete database variables. Do not also provide `DATABASE_URL`, because Rails can merge it over the primary configuration and create a different connection contract from the cache, queue, and cable databases.
+
+The configured production process runs Solid Queue within Puma (`SOLID_QUEUE_IN_PUMA=true`).
 
 The health-check endpoint is available at `/up`.

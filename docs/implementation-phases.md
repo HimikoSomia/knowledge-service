@@ -8,6 +8,7 @@ This document is the durable index for the application-update phases. It records
 | 02 | Complete | Embedding-job retry, discard, and failure policy. |
 | 03 | Complete | Idempotent document processing, duplicate-delivery protection, and stale-generation rejection. |
 | 04 | Complete | Explicit enrichment outcomes for success, skipped configuration, partial image failure, transient retry, and exhausted retry. See [ADR 0001](decisions/0001-enrichment-outcome-semantics.md). |
+| 05 | Complete | Standardize production PostgreSQL configuration on discrete host, port, username, and password variables. See [ADR 0002](decisions/0002-production-database-environment.md). |
 
 ## Phase 04 acceptance summary
 
