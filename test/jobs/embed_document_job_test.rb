@@ -58,7 +58,20 @@ class EmbedDocumentJobTest < ActiveJob::TestCase
     create_chunks(@document, 1)
     service = embedding_service(error: Embedding::OpenAiEmbeddingService::ConfigurationError.new("bad config"))
 
-    assert_nothing_raised { perform_job(service) }
+    assert_no_enqueued_jobs do
+      assert_nothing_raised { perform_job(service) }
+    end
+
+    assert_equal "failed", @document.reload.status
+  end
+
+  test "discards invalid input errors without retrying" do
+    create_chunks(@document, 1)
+    service = embedding_service(error: Embedding::OpenAiEmbeddingService::InvalidInputError.new("blank input"))
+
+    assert_no_enqueued_jobs do
+      assert_nothing_raised { perform_job(service) }
+    end
 
     assert_equal "failed", @document.reload.status
   end
@@ -67,12 +80,32 @@ class EmbedDocumentJobTest < ActiveJob::TestCase
     create_chunks(@document, 1)
     service = embedding_service(error: Embedding::OpenAiEmbeddingService::ServiceError.new("timeout"))
 
-    perform_job(service)
+    assert_enqueued_jobs 1, only: EmbedDocumentJob do
+      perform_job(service)
+    end
 
     @document.reload
     assert_equal "failed", @document.status
     assert @document.error_message.present?
     assert_not_equal "timeout", @document.error_message
+  end
+
+  test "retries service errors for five attempts" do
+    create_chunks(@document, 1)
+
+    assert_retry_policy Embedding::OpenAiEmbeddingService::ServiceError, attempts: 5
+  end
+
+  test "retries rate limit errors for ten attempts" do
+    create_chunks(@document, 1)
+
+    assert_retry_policy Embedding::OpenAiEmbeddingService::RateLimitError, attempts: 10
+  end
+
+  test "retries unexpected errors for three attempts" do
+    create_chunks(@document, 1)
+
+    assert_retry_policy RuntimeError, attempts: 3, handler_class: StandardError
   end
 
   test "skips a ready document when every chunk uses the current model" do
@@ -105,7 +138,9 @@ class EmbedDocumentJobTest < ActiveJob::TestCase
   end
 
   test "discards if document does not exist" do
-    assert_nothing_raised { EmbedDocumentJob.perform_now(0) }
+    assert_no_enqueued_jobs do
+      assert_nothing_raised { EmbedDocumentJob.perform_now(0) }
+    end
   end
 
   test "is enqueued directly after extraction when enrichment is unnecessary" do
@@ -154,8 +189,32 @@ class EmbedDocumentJobTest < ActiveJob::TestCase
   end
 
   def perform_job(service)
+    build_job(service).perform_now
+  end
+
+  def build_job(service)
     job = EmbedDocumentJob.new(@document.id)
     job.define_singleton_method(:embedding_service) { service }
-    job.perform_now
+    job
+  end
+
+  def assert_retry_policy(error_class, attempts:, handler_class: error_class)
+    retry_key = [ handler_class ].to_s
+    standard_error_key = [ StandardError ].to_s
+
+    before_limit = build_job(embedding_service(error: error_class.new("retryable failure")))
+    before_limit.exception_executions[retry_key] = attempts - 2
+    before_limit.exception_executions[standard_error_key] = 2 unless retry_key == standard_error_key
+
+    assert_enqueued_jobs 1, only: EmbedDocumentJob do
+      before_limit.perform_now
+    end
+
+    at_limit = build_job(embedding_service(error: error_class.new("retryable failure")))
+    at_limit.exception_executions[retry_key] = attempts - 1
+
+    assert_no_enqueued_jobs do
+      assert_raises(error_class) { at_limit.perform_now }
+    end
   end
 end

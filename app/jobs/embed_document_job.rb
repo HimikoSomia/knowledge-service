@@ -14,12 +14,14 @@ class EmbedDocumentJob < ApplicationJob
 
   queue_as :embedding
 
-  discard_on ActiveRecord::RecordNotFound
-  discard_on Embedding::OpenAiEmbeddingService::ConfigurationError
-  discard_on Embedding::OpenAiEmbeddingService::InvalidInputError
-  retry_on  Embedding::OpenAiEmbeddingService::RateLimitError, wait: :polynomially_longer, attempts: 10
+  # Active Job searches handlers from bottom to top, so broad handlers must be
+  # declared before the more specific retry and discard policies.
+  retry_on  StandardError,                                      wait: :polynomially_longer, attempts: 3
   retry_on  Embedding::OpenAiEmbeddingService::ServiceError,   wait: :polynomially_longer, attempts: 5
-  retry_on  StandardError,                               wait: :polynomially_longer, attempts: 3
+  retry_on  Embedding::OpenAiEmbeddingService::RateLimitError, wait: :polynomially_longer, attempts: 10
+  discard_on Embedding::OpenAiEmbeddingService::InvalidInputError
+  discard_on Embedding::OpenAiEmbeddingService::ConfigurationError
+  discard_on ActiveRecord::RecordNotFound
 
   def perform(document_id)
     document = Document.find(document_id)
