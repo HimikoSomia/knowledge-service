@@ -143,4 +143,39 @@ class DocumentTest < ActiveSupport::TestCase
       doc.save!
     end
   end
+
+  test "a current stage claim cannot fail a newer file generation" do
+    doc = documents(:pending_doc)
+    doc.update_columns(
+      processing_generation: 3,
+      processing_job_id: "new-job",
+      processing_job_execution: 0,
+      status: "pending"
+    )
+
+    assert_not doc.fail_current_processing!(generation: 2, job_id: "old-job", message: "stale failure")
+    assert_equal "pending", doc.reload.status
+    assert_nil doc.error_message
+  end
+
+  test "replacing a file before extraction queues a new generation" do
+    doc = @user.documents.new(title: "Replace Before Extraction")
+    doc.file.attach(io: File.open(file_fixture("sample.txt")), filename: "sample.txt", content_type: "text/plain")
+    doc.save!
+    original_generation = doc.reload.processing_generation
+    clear_enqueued_jobs
+
+    assert_enqueued_with(job: ProcessDocumentJob) do
+      doc.file.attach(
+        io: StringIO.new("replacement document content"),
+        filename: "replacement.txt",
+        content_type: "text/plain"
+      )
+    end
+
+    doc.reload
+    assert_equal original_generation + 1, doc.processing_generation
+    assert_equal doc.file.blob.checksum, doc.processing_checksum
+    assert_equal "pending", doc.status
+  end
 end

@@ -27,7 +27,7 @@ class EnrichDocumentJobTest < ActiveJob::TestCase
     create_core_chunk
     add_image_ref
 
-    assert_enqueued_with(job: EmbedDocumentJob, args: [ @document.id ]) do
+    assert_enqueued_with(job: EmbedDocumentJob, args: [ @document.id, @document.processing_generation ]) do
       perform_job(unconfigured_vision_service)
     end
 
@@ -41,7 +41,7 @@ class EnrichDocumentJobTest < ActiveJob::TestCase
     def vision.configured? = true
     def vision.describe_image_from_document(_, _) = "A chart showing quarterly growth."
 
-    assert_enqueued_with(job: EmbedDocumentJob, args: [ @document.id ]) do
+    assert_enqueued_with(job: EmbedDocumentJob, args: [ @document.id, @document.processing_generation ]) do
       perform_job(vision)
     end
 
@@ -63,7 +63,40 @@ class EnrichDocumentJobTest < ActiveJob::TestCase
   end
 
   test "discards job when document does not exist" do
-    assert_nothing_raised { EnrichDocumentJob.perform_now(0) }
+    assert_no_enqueued_jobs do
+      assert_nothing_raised { EnrichDocumentJob.perform_now(0) }
+    end
+  end
+
+  test "retry upserts an image description instead of duplicating it" do
+    create_core_chunk
+    add_image_ref
+    vision = Object.new
+    def vision.configured? = true
+    def vision.describe_image_from_document(_, _) = "A chart showing quarterly growth."
+
+    job = EnrichDocumentJob.new(@document.id, @document.processing_generation)
+    job.define_singleton_method(:vision_service) { vision }
+    handoff_attempts = 0
+    job.define_singleton_method(:continue_to_embedding) do |*args, **kwargs|
+      handoff_attempts += 1
+      raise "handoff interrupted" if handoff_attempts == 1
+
+      super(*args, **kwargs)
+    end
+
+    assert_enqueued_jobs 1, only: EnrichDocumentJob do
+      job.perform_now
+    end
+    clear_enqueued_jobs
+
+    assert_enqueued_jobs 1, only: EmbedDocumentJob do
+      job.perform_now
+    end
+
+    descriptions = @document.document_chunks.where(source_key: "image_ref:0")
+    assert_equal 1, descriptions.count
+    assert_equal 2, @document.document_chunks.count
   end
 
   private
@@ -90,7 +123,7 @@ class EnrichDocumentJobTest < ActiveJob::TestCase
   end
 
   def perform_job(service)
-    job = EnrichDocumentJob.new(@document.id)
+    job = EnrichDocumentJob.new(@document.id, @document.processing_generation)
     job.define_singleton_method(:vision_service) { service }
     job.perform_now
   end

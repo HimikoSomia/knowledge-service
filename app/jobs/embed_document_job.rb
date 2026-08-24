@@ -23,11 +23,18 @@ class EmbedDocumentJob < ApplicationJob
   discard_on Embedding::OpenAiEmbeddingService::ConfigurationError
   discard_on ActiveRecord::RecordNotFound
 
-  def perform(document_id)
+  def perform(document_id, generation = nil)
     document = Document.find(document_id)
-    service = embedding_service
+    claimed = document.claim_processing_stage!(
+      generation: generation,
+      job_id: job_id,
+      execution: executions,
+      queued_status: [ "embedding", "ready" ],
+      running_status: "embedding"
+    )
+    return unless claimed
 
-    return if document.ready? && chunks_needing_embedding(document, service).none?
+    service = embedding_service
 
     unless document.processed_at?
       Rails.logger.warn do
@@ -37,23 +44,33 @@ class EmbedDocumentJob < ApplicationJob
     end
 
     unless document.document_chunks.exists?
-      document.mark_processed!
+      document.complete_current_processing!(
+        generation: generation,
+        job_id: job_id,
+        attributes: { status: "processed" }
+      )
       return
     end
 
     unless service.configured?
       Rails.logger.warn "EmbedDocumentJob: OPENAI_API_KEY not configured — skipping document #{document_id}"
-      document.mark_processed!
+      document.complete_current_processing!(
+        generation: generation,
+        job_id: job_id,
+        attributes: { status: "processed" }
+      )
       return
     end
-
-    document.mark_embedding!
 
     chunks_to_embed = chunks_needing_embedding(document, service).order(:chunk_index).to_a
 
     if chunks_to_embed.empty?
       Rails.logger.info "EmbedDocumentJob: document #{document_id} — all chunks already embedded"
-      document.mark_ready!
+      document.complete_current_processing!(
+        generation: generation,
+        job_id: job_id,
+        attributes: { status: "ready", embedded_at: Time.current }
+      )
       return
     end
 
@@ -62,7 +79,7 @@ class EmbedDocumentJob < ApplicationJob
       "(model=#{service.model}, batch_size=#{service.batch_size})"
     end
 
-    embed_batches(document, chunks_to_embed, service)
+    return unless embed_batches(document, generation, chunks_to_embed, service)
 
     # Verify nothing was left behind.
     remaining = chunks_needing_embedding(document, service).count
@@ -71,11 +88,17 @@ class EmbedDocumentJob < ApplicationJob
             "document #{document_id} — will retry"
     end
 
-    document.mark_ready!
+    completed = document.complete_current_processing!(
+      generation: generation,
+      job_id: job_id,
+      attributes: { status: "ready", embedded_at: Time.current }
+    )
+    return unless completed
+
     Rails.logger.info "EmbedDocumentJob: document #{document_id} fully embedded (#{document.chunk_count} chunks)"
   rescue => e
     friendly = log_and_friendly_message(e, context: "document #{document_id} embedding")
-    document&.mark_failed!(friendly)
+    document&.fail_current_processing!(generation: generation, job_id: job_id, message: friendly)
     raise
   end
 
@@ -93,10 +116,12 @@ class EmbedDocumentJob < ApplicationJob
       .or(chunks.where.not(embedding_model: service.model))
   end
 
-  def embed_batches(document, chunks, service)
+  def embed_batches(document, generation, chunks, service)
     start_time = Time.current
 
     chunks.each_slice(service.batch_size).with_index(1) do |batch, batch_num|
+      return false unless document.processing_stage_current?(generation: generation, job_id: job_id)
+
       # Build the texts sent to OpenAI. Heading context is prepended to improve
       # semantic quality without altering the stored chunk.content.
       embed_texts = batch.map { |chunk| embed_text_for(chunk) }
@@ -107,7 +132,10 @@ class EmbedDocumentJob < ApplicationJob
 
       # Persist this batch inside a short transaction.
       now = Time.current
-      DocumentChunk.transaction do
+      persisted = document.with_lock do
+        document.reload
+        next false unless document.processing_generation == generation.to_i && document.processing_job_id == job_id
+
         batch.zip(vectors).each do |chunk, vector|
           chunk.update_columns(
             embedding:       vector,
@@ -115,7 +143,9 @@ class EmbedDocumentJob < ApplicationJob
             updated_at:      now
           )
         end
+        true
       end
+      return false unless persisted
 
       Rails.logger.info do
         "EmbedDocumentJob: batch #{batch_num} complete — " \
@@ -125,6 +155,7 @@ class EmbedDocumentJob < ApplicationJob
 
     elapsed = (Time.current - start_time).round(2)
     Rails.logger.info "EmbedDocumentJob: document #{document.id} — all batches done in #{elapsed}s"
+    true
   end
 
   # Returns the text that will be sent to OpenAI for this chunk.

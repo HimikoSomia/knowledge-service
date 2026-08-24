@@ -144,9 +144,43 @@ class EmbedDocumentJobTest < ActiveJob::TestCase
   end
 
   test "is enqueued directly after extraction when enrichment is unnecessary" do
+    @document.update_columns(status: "pending", processing_job_execution: 0)
+
     assert_enqueued_jobs 1, only: EmbedDocumentJob do
-      ProcessDocumentJob.perform_now(@document.id)
+      ProcessDocumentJob.perform_now(@document.id, @document.processing_generation)
     end
+  end
+
+  test "duplicate delivery does not call the embedding provider twice" do
+    create_chunks(@document, 1)
+    call_count = 0
+    service = embedding_service(vectors: fake_vectors(1), counter: -> { call_count += 1 })
+
+    perform_job(service)
+    perform_job(service)
+
+    assert_equal 1, call_count
+    assert_equal "ready", @document.reload.status
+  end
+
+  test "stale provider results cannot overwrite a newer file generation" do
+    create_chunks(@document, 1)
+    original_generation = @document.processing_generation
+    document = @document
+    service = embedding_service(vectors: fake_vectors(1), counter: -> {
+      document.update_columns(
+        processing_generation: original_generation + 1,
+        processing_job_id: "replacement-job",
+        processing_job_execution: 0,
+        status: "pending"
+      )
+    })
+
+    perform_job(service)
+
+    @document.reload
+    assert_equal "pending", @document.status
+    assert_nil @document.document_chunks.first.embedding
   end
 
   private
@@ -193,7 +227,7 @@ class EmbedDocumentJobTest < ActiveJob::TestCase
   end
 
   def build_job(service)
-    job = EmbedDocumentJob.new(@document.id)
+    job = EmbedDocumentJob.new(@document.id, @document.processing_generation)
     job.define_singleton_method(:embedding_service) { service }
     job
   end
@@ -210,6 +244,7 @@ class EmbedDocumentJobTest < ActiveJob::TestCase
       before_limit.perform_now
     end
 
+    @document.update_columns(status: "embedding", processing_job_id: nil, processing_job_execution: 0)
     at_limit = build_job(embedding_service(error: error_class.new("retryable failure")))
     at_limit.exception_executions[retry_key] = attempts - 1
 

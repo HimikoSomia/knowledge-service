@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_18_000001) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_24_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -54,11 +54,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_18_000001) do
     t.integer "end_char"
     t.jsonb "metadata", default: {}, null: false
     t.integer "page_number"
+    t.string "source_key"
     t.integer "start_char"
     t.integer "token_count"
     t.datetime "updated_at", null: false
     t.index ["document_id", "chunk_index"], name: "index_document_chunks_on_document_id_and_chunk_index", unique: true
     t.index ["document_id", "embedding_model"], name: "index_document_chunks_on_document_id_and_model"
+    t.index ["document_id", "source_key"], name: "index_document_chunks_on_document_and_source_key", unique: true, where: "(source_key IS NOT NULL)"
     t.index ["document_id"], name: "index_document_chunks_on_document_id"
   end
 
@@ -82,6 +84,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_18_000001) do
     t.jsonb "extracted_content", default: {}, null: false
     t.string "file_checksum"
     t.datetime "processed_at"
+    t.string "processing_checksum"
+    t.integer "processing_generation", default: 0, null: false
+    t.integer "processing_job_execution", default: 0, null: false
+    t.string "processing_job_id"
     t.datetime "processing_started_at"
     t.string "status", default: "pending", null: false
     t.string "title", null: false
