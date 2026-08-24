@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_24_000001) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_24_000002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -80,6 +80,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_000001) do
     t.string "document_type"
     t.datetime "embedded_at"
     t.datetime "enriched_at"
+    t.string "enrichment_status", default: "not_required", null: false
     t.text "error_message"
     t.jsonb "extracted_content", default: {}, null: false
     t.string "file_checksum"
@@ -95,6 +96,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_000001) do
     t.bigint "user_id", null: false
     t.index ["status", "created_at"], name: "index_documents_on_status_and_created_at"
     t.index ["user_id"], name: "index_documents_on_user_id"
+    t.check_constraint "enrichment_status::text = ANY (ARRAY['not_required'::character varying, 'pending'::character varying, 'in_progress'::character varying, 'succeeded'::character varying, 'skipped'::character varying, 'partial'::character varying, 'failed'::character varying]::text[])", name: "documents_enrichment_status_check"
   end
 
   create_table "sessions", force: :cascade do |t|

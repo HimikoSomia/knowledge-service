@@ -9,6 +9,16 @@ class Document < ApplicationRecord
     failed: "failed"
   }.freeze
 
+  ENRICHMENT_STATUSES = {
+    not_required: "not_required",
+    pending: "pending",
+    in_progress: "in_progress",
+    succeeded: "succeeded",
+    skipped: "skipped",
+    partial: "partial",
+    failed: "failed"
+  }.freeze
+
   MAX_FILE_SIZE = 50.megabytes
 
   has_one_attached :file
@@ -18,6 +28,7 @@ class Document < ApplicationRecord
   has_many :document_chunks, dependent: :destroy
 
   enum :status, STATUSES, validate: true
+  enum :enrichment_status, ENRICHMENT_STATUSES, prefix: :enrichment, validate: true
 
   validates :title, presence: true
   validate :file_must_be_attached, on: :create
@@ -201,6 +212,7 @@ class Document < ApplicationRecord
         processing_started_at: nil,
         processed_at: nil,
         enriched_at: nil,
+        enrichment_status: "not_required",
         embedded_at: nil,
         error_message: nil
       )

@@ -27,6 +27,10 @@ module DocumentProcessingLogging
       "Embedding service is not configured. Please check the application settings."
     when Embedding::OpenAiEmbeddingService::InvalidInputError
       "A chunk could not be embedded due to invalid content."
+    when Enrichment::OpenAiVisionService::TransientError
+      "Image enrichment is temporarily unavailable. Processing will retry automatically."
+    when Enrichment::OpenAiVisionService::ConfigurationError
+      "Image enrichment is not configured correctly. Extracted text will remain available."
     when Timeout::Error, Faraday::TimeoutError, Faraday::ConnectionFailed
       "Processing timed out. It will be retried automatically."
     when ActiveRecord::RecordNotFound

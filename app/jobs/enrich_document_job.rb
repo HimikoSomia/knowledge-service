@@ -11,7 +11,17 @@ class EnrichDocumentJob < ApplicationJob
 
   queue_as :enrichment
 
-  retry_on StandardError, wait: :polynomially_longer, attempts: 3
+  retry_on StandardError, wait: :polynomially_longer, attempts: 3 do |job, error|
+    job.send(:finalize_exhausted_enrichment, error)
+  end
+  retry_on Enrichment::OpenAiVisionService::TransientError,
+           wait: :polynomially_longer,
+           attempts: 3 do |job, error|
+    job.send(:finalize_exhausted_enrichment, error)
+  end
+  discard_on Enrichment::OpenAiVisionService::ConfigurationError do |job, error|
+    job.send(:finalize_exhausted_enrichment, error)
+  end
   discard_on ActiveRecord::RecordNotFound
 
   def perform(document_id, generation = nil)
@@ -27,11 +37,30 @@ class EnrichDocumentJob < ApplicationJob
     )
     return unless claimed
 
-    image_refs = pending_image_refs(document)
+    current = document.update_current_processing!(
+      generation: generation,
+      job_id: job_id,
+      attributes: { enrichment_status: "in_progress", enriched_at: nil }
+    )
+    return unless current
+
+    image_refs = eligible_image_refs(document)
 
     if image_refs.empty?
       Rails.logger.info "EnrichDocumentJob: document #{document_id} has no image refs"
-      job_id_for_failure = continue_to_embedding(document, generation)
+      job_id_for_failure = continue_to_embedding(
+        document,
+        generation,
+        enrichment_status: "not_required",
+        completed_at: nil
+      )
+      return
+    end
+
+    pending_refs = image_refs.reject { |_, _, section| terminal_image_outcome?(section) }
+
+    if pending_refs.empty?
+      job_id_for_failure = finish_recorded_outcome(document, generation, image_refs)
       return
     end
 
@@ -39,16 +68,21 @@ class EnrichDocumentJob < ApplicationJob
 
     unless vision.configured?
       Rails.logger.info "EnrichDocumentJob: vision service not configured, skipping document #{document_id}"
-      job_id_for_failure = continue_to_embedding(document, generation)
+      skipped = pending_refs.map do |_, source_key, _|
+        image_outcome(source_key, status: "skipped", error_code: "not_configured")
+      end
+      return unless persist_enrichment_results(document, generation, [], skipped)
+
+      job_id_for_failure = finish_recorded_outcome(document, generation, image_refs)
       return
     end
 
-    new_chunks = build_enriched_chunks(document, generation, image_refs, vision)
+    new_chunks, outcomes = build_enrichment_results(document, generation, pending_refs, vision)
     return unless document.processing_stage_current?(generation: generation, job_id: job_id)
 
-    return unless persist_enriched_chunks(document, generation, new_chunks)
+    return unless persist_enrichment_results(document, generation, new_chunks, outcomes)
     Rails.logger.info "EnrichDocumentJob: document #{document_id} enriched — #{new_chunks.size} new chunks"
-    job_id_for_failure = continue_to_embedding(document, generation, enriched: true)
+    job_id_for_failure = finish_recorded_outcome(document, generation, image_refs)
   rescue => e
     friendly = log_and_friendly_message(e, context: "document #{document_id} enrichment")
     document&.fail_current_processing!(
@@ -65,7 +99,12 @@ class EnrichDocumentJob < ApplicationJob
     Enrichment::OpenAiVisionService.new
   end
 
-  def continue_to_embedding(document, generation, enriched: false)
+  def continue_to_embedding(document, generation, enrichment_status:, completed_at: Time.current)
+    outcome_attributes = {
+      enrichment_status: enrichment_status,
+      enriched_at: completed_at
+    }
+
     if document.document_chunks.exists?
       next_job = EmbedDocumentJob.new(document.id, generation)
       handed_off = document.handoff_processing!(
@@ -73,43 +112,64 @@ class EnrichDocumentJob < ApplicationJob
         job_id: job_id,
         next_job: next_job,
         status: "embedding",
-        attributes: enriched ? { enriched_at: Time.current } : {}
+        attributes: outcome_attributes
       )
       return job_id unless handed_off
 
       @job_id_for_failure = next_job.job_id
-      next_job.enqueue
+      begin
+        next_job.enqueue
+      rescue
+        document.update_current_processing!(
+          generation: generation,
+          job_id: next_job.job_id,
+          attributes: {
+            status: "failed",
+            processing_job_id: job_id,
+            processing_job_execution: executions
+          }
+        )
+        @job_id_for_failure = job_id
+        raise
+      end
       next_job.job_id
     else
-      attributes = { status: "processed" }
-      attributes[:enriched_at] = Time.current if enriched
+      attributes = outcome_attributes.merge(status: "processed")
       document.complete_current_processing!(generation: generation, job_id: job_id, attributes: attributes)
       job_id
     end
   end
 
-  def pending_image_refs(document)
+  def eligible_image_refs(document)
     document.extracted_content.fetch("sections", []).each_with_index.filter_map do |section, index|
       next unless section["type"] == "image_ref" && section["skipped_reason"] != "too_small"
 
-      [ section, "image_ref:#{index}" ]
+      [ index, "image_ref:#{index}", section ]
     end
   end
 
-  def build_enriched_chunks(document, generation, image_refs, vision)
+  def build_enrichment_results(document, generation, image_refs, vision)
     chunks = []
+    outcomes = []
 
-    image_refs.each do |image_ref, source_key|
+    image_refs.each do |_, source_key, image_ref|
       break unless document.processing_stage_current?(generation: generation, job_id: job_id)
 
       description = begin
         vision.describe_image_from_document(document, image_ref)
-      rescue => e
-        Rails.logger.error "EnrichDocumentJob: vision failed for image_ref #{image_ref.inspect}: #{e.message}"
-        nil
+      rescue Enrichment::OpenAiVisionService::PermanentImageError => e
+        Rails.logger.warn do
+          "EnrichDocumentJob: permanent image failure document=#{document.id} " \
+            "source_key=#{source_key} code=#{e.code}"
+        end
+        outcomes << image_outcome(source_key, status: "failed", error_code: e.code)
+        next
       end
 
-      next if description.blank?
+      if description.blank?
+        outcomes << image_outcome(source_key, status: "failed", error_code: "empty_description")
+        next
+      end
 
       chunks << {
         source_key:  source_key,
@@ -122,15 +182,27 @@ class EnrichDocumentJob < ApplicationJob
           "heading"     => image_ref["heading"]
         }.compact
       }
+      outcomes << image_outcome(source_key, status: "succeeded")
     end
 
-    chunks
+    [ chunks, outcomes ]
   end
 
-  def persist_enriched_chunks(document, generation, chunks)
+  def persist_enrichment_results(document, generation, chunks, outcomes)
     document.with_lock do
       document.reload
       return false unless document.processing_generation == generation.to_i && document.processing_job_id == job_id
+
+      extracted_content = document.extracted_content.deep_dup
+      outcomes.each do |outcome|
+        section = extracted_content.fetch("sections", [])[outcome[:section_index]]
+        next unless section
+
+        section["enrichment"] = {
+          "status" => outcome[:status],
+          "error_code" => outcome[:error_code]
+        }.compact
+      end
 
       if chunks.any?
         existing_indexes = document.document_chunks.where(source_key: chunks.pluck(:source_key)).pluck(:source_key, :chunk_index).to_h
@@ -161,8 +233,83 @@ class EnrichDocumentJob < ApplicationJob
         )
       end
 
-      document.update_columns(chunk_count: document.document_chunks.count)
+      document.update_columns(
+        extracted_content: extracted_content,
+        chunk_count: document.document_chunks.count
+      )
       true
+    end
+  end
+
+  def finish_recorded_outcome(document, generation, image_refs)
+    document.reload
+    outcome = recorded_enrichment_outcome(document, image_refs)
+
+    if outcome == "failed"
+      document.complete_current_processing!(
+        generation: generation,
+        job_id: job_id,
+        attributes: {
+          status: "processed",
+          enrichment_status: "failed",
+          enriched_at: Time.current
+        }
+      )
+      job_id
+    else
+      continue_to_embedding(document, generation, enrichment_status: outcome)
+    end
+  end
+
+  def recorded_enrichment_outcome(document, image_refs)
+    sections = document.extracted_content.fetch("sections", [])
+    statuses = image_refs.map { |index, _, _| sections[index]&.dig("enrichment", "status") }
+
+    return "succeeded" if statuses.all?("succeeded")
+    return "skipped" if statuses.all?("skipped")
+    return "failed" if statuses.all?("failed")
+
+    "partial"
+  end
+
+  def terminal_image_outcome?(section)
+    section.dig("enrichment", "status").in?(%w[succeeded skipped failed])
+  end
+
+  def image_outcome(source_key, status:, error_code: nil)
+    {
+      section_index: source_key.delete_prefix("image_ref:").to_i,
+      status: status,
+      error_code: error_code
+    }
+  end
+
+  def finalize_exhausted_enrichment(error)
+    document_id, generation = arguments
+    document = Document.find_by(id: document_id)
+    return unless document
+
+    image_refs = eligible_image_refs(document)
+    outcome = if image_refs.any? && image_refs.all? { |_, _, section| terminal_image_outcome?(section) }
+      recorded_enrichment_outcome(document, image_refs)
+    else
+      "failed"
+    end
+
+    completed = document.complete_current_processing!(
+      generation: generation,
+      job_id: job_id,
+      attributes: {
+        status: "processed",
+        enrichment_status: outcome,
+        enriched_at: Time.current
+      }
+    )
+    return unless completed
+
+    Rails.logger.warn do
+      "EnrichDocumentJob: enrichment ended without completion document=#{document_id} " \
+        "error=#{error.class}"
     end
   end
 end

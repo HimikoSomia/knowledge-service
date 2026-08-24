@@ -33,7 +33,14 @@
               </td>
               <td class="whitespace-nowrap text-base-content/70"><%= document.document_type.presence || "Unknown" %></td>
               <td>
-                <span class="<%= status_badge_class(document.status) %>"><%= document.status %></span>
+                <div class="flex flex-col items-start gap-1">
+                  <span class="<%= status_badge_class(document.status) %>"><%= document.status %></span>
+                  <% unless document.enrichment_not_required? %>
+                    <span class="<%= enrichment_status_badge_class(document) %>">
+                      Vision: <%= enrichment_status_label(document) %>
+                    </span>
+                  <% end %>
+                </div>
               </td>
               <td class="text-right text-base-content/70"><%= number_with_delimiter(document.chunk_count.to_i) %></td>
               <td class="text-right">

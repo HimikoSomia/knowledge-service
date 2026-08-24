@@ -52,6 +52,8 @@ class ProcessDocumentJob < ApplicationJob
           next_job_description = "enrichment queued"
           attributes.merge!(
             status: "enriching",
+            enrichment_status: "pending",
+            enriched_at: nil,
             processing_job_id: next_job.job_id,
             processing_job_execution: 0
           )
@@ -60,12 +62,18 @@ class ProcessDocumentJob < ApplicationJob
           next_job_description = "embedding queued"
           attributes.merge!(
             status: "embedding",
+            enrichment_status: "not_required",
             processing_job_id: next_job.job_id,
             processing_job_execution: 0
           )
         else
           next_job_description = "processing complete"
-          attributes.merge!(status: "processed", processing_job_id: nil, processing_job_execution: 0)
+          attributes.merge!(
+            status: "processed",
+            enrichment_status: "not_required",
+            processing_job_id: nil,
+            processing_job_execution: 0
+          )
         end
 
         document.update_columns(attributes)

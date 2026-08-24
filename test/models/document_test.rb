@@ -48,6 +48,13 @@ class DocumentTest < ActiveSupport::TestCase
     assert_includes doc.errors[:status], "is not included in the list"
   end
 
+  test "invalid with unknown enrichment status" do
+    doc = @user.documents.new(title: "Test", enrichment_status: "unknown")
+    doc.file.attach(io: File.open(file_fixture("sample.txt")), filename: "sample.txt", content_type: "text/plain")
+    assert_not doc.valid?
+    assert_includes doc.errors[:enrichment_status], "is not included in the list"
+  end
+
   # --- document_type auto-detection ---
 
   test "detects document_type from content_type on save" do
@@ -177,5 +184,7 @@ class DocumentTest < ActiveSupport::TestCase
     assert_equal original_generation + 1, doc.processing_generation
     assert_equal doc.file.blob.checksum, doc.processing_checksum
     assert_equal "pending", doc.status
+    assert doc.enrichment_not_required?
+    assert_nil doc.enriched_at
   end
 end

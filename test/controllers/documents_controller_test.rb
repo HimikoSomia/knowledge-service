@@ -16,6 +16,27 @@ class DocumentsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
+  test "show explains partial image enrichment separately from processing status" do
+    document = documents(:processed_doc)
+    document.update_columns(enrichment_status: "partial", enriched_at: Time.current)
+
+    get document_path(document)
+
+    assert_response :success
+    assert_select ".badge", text: /Vision: Partial/
+    assert_match "Some images could not be described", response.body
+  end
+
+  test "index displays skipped image enrichment outcome" do
+    document = documents(:processed_doc)
+    document.update_columns(enrichment_status: "skipped", enriched_at: Time.current)
+
+    get documents_path
+
+    assert_response :success
+    assert_select ".badge", text: /Vision: Skipped/
+  end
+
   test "new renders form" do
     get new_document_path
     assert_response :success

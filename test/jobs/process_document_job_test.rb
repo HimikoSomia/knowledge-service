@@ -27,6 +27,28 @@ class ProcessDocumentJobTest < ActiveJob::TestCase
     assert @document.document_chunks.count > 0
   end
 
+  test "queues image enrichment with an explicit pending outcome" do
+    result = Extraction::ExtractionResult.new(
+      raw_text: "",
+      sections: [
+        { "type" => "image_ref", "source_type" => "uploaded", "page_number" => 1, "image_index" => 0 }
+      ]
+    )
+    extractor = Object.new
+    extractor.define_singleton_method(:extract) { |_| result }
+    job = ProcessDocumentJob.new(@document.id, @document.processing_generation)
+    job.define_singleton_method(:extractor_for) { |_| extractor }
+
+    assert_enqueued_with(job: EnrichDocumentJob, args: [ @document.id, @document.processing_generation ]) do
+      job.perform_now
+    end
+
+    @document.reload
+    assert_equal "enriching", @document.status
+    assert @document.enrichment_pending?
+    assert_nil @document.enriched_at
+  end
+
   test "skips if document already processed with same checksum" do
     checksum = @document.file.blob.checksum
     @document.update_columns(status: "ready", file_checksum: checksum)

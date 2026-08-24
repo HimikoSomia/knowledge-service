@@ -60,16 +60,18 @@ class Enrichment::OpenAiVisionServiceTest < ActiveSupport::TestCase
     assert_equal "A text file containing sample content.", result
   end
 
-  test "returns nil when pdftoppm is unavailable for PDF page" do
+  test "raises a permanent image error when pdftoppm is unavailable for PDF page" do
     image_ref = { "type" => "image_ref", "source_type" => "embedded",
                   "page_number" => 1, "image_index" => 0 }
 
     @service.define_singleton_method(:pdftoppm_available?) { false }
-    result = @service.describe_image_from_document(@document, image_ref)
-    assert_nil result
+    error = assert_raises(Enrichment::OpenAiVisionService::PermanentImageError) do
+      @service.describe_image_from_document(@document, image_ref)
+    end
+    assert_equal "renderer_unavailable", error.code
   end
 
-  test "returns nil and logs on API error" do
+  test "classifies an API error without a status as transient" do
     image_ref = { "type" => "image_ref", "source_type" => "uploaded",
                   "page_number" => 1, "image_index" => 0 }
 
@@ -85,8 +87,35 @@ class Enrichment::OpenAiVisionServiceTest < ActiveSupport::TestCase
     end
     OpenAI::Client.define_singleton_method(:new) { |**_| fake }
 
-    result = @service.describe_image_from_document(@document, image_ref)
-    assert_nil result  # error is swallowed, nil returned
+    assert_raises(Enrichment::OpenAiVisionService::TransientError) do
+      @service.describe_image_from_document(@document, image_ref)
+    end
+  end
+
+  test "classifies rejected image input as a permanent image error" do
+    error = vision_api_error(status: 400)
+    stub_vision_exception(error)
+
+    raised = assert_raises(Enrichment::OpenAiVisionService::PermanentImageError) do
+      describe_uploaded_image
+    end
+    assert_equal "provider_rejected_image", raised.code
+  end
+
+  test "classifies provider authentication failure as configuration error" do
+    stub_vision_exception(vision_api_error(status: 401))
+
+    assert_raises(Enrichment::OpenAiVisionService::ConfigurationError) do
+      describe_uploaded_image
+    end
+  end
+
+  test "classifies rate limiting as transient" do
+    stub_vision_exception(vision_api_error(status: 429))
+
+    assert_raises(Enrichment::OpenAiVisionService::TransientError) do
+      describe_uploaded_image
+    end
   end
 
   private
@@ -96,5 +125,27 @@ class Enrichment::OpenAiVisionServiceTest < ActiveSupport::TestCase
     fake = Object.new
     fake.define_singleton_method(:chat) { |**_| fake_response }
     OpenAI::Client.define_singleton_method(:new) { |**_| fake }
+  end
+
+  def stub_vision_exception(error)
+    fake = Object.new
+    fake.define_singleton_method(:chat) { |**_| raise error }
+    OpenAI::Client.define_singleton_method(:new) { |**_| fake }
+  end
+
+  def vision_api_error(status:)
+    Faraday::ClientError.new("provider error", { status: status })
+  end
+
+  def describe_uploaded_image
+    @document.file.attach(
+      io: File.new(file_fixture("sample.txt")),
+      filename: "sample.png",
+      content_type: "image/png"
+    )
+    @service.describe_image_from_document(
+      @document,
+      { "type" => "image_ref", "source_type" => "uploaded", "page_number" => 1, "image_index" => 0 }
+    )
   end
 end

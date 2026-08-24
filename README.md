@@ -88,11 +88,16 @@ Without `OPENAI_API_KEY`, document extraction and chunking still run, but the do
 
 1. Uploading a document queues `ProcessDocumentJob`.
 2. The job extracts structured text, stores extraction metadata, and creates document chunks.
-3. Documents containing image references run optional vision enrichment.
-4. After enrichment finishes (or is skipped), documents with chunks run `EmbedDocumentJob`, which stores 1,536-dimension vectors using the configured embedding model.
-5. Workspace search embeds the query and returns only the signed-in user's embedded chunks that belong to that workspace.
+3. Documents containing eligible image references run optional vision enrichment. The enrichment outcome is tracked separately from the main processing status:
+   - `succeeded`: every eligible image was described.
+   - `skipped`: OpenAI Vision is not configured; extracted text is preserved and processing continues.
+   - `partial`: some images were described while permanent failures were safely recorded for others.
+   - `failed`: transient or stage-wide failures exhausted their retries; extracted text is preserved and the document remains processed but not fully enriched.
+4. Transient Vision API and network errors are retried by Active Job. A permanent failure for one image does not discard descriptions successfully generated for other images.
+5. After enrichment succeeds, is skipped, or partially succeeds, documents with chunks run `EmbedDocumentJob`, which stores 1,536-dimension vectors using the configured embedding model.
+6. Workspace search embeds the query and returns only the signed-in user's embedded chunks that belong to that workspace.
 
-The stages run sequentially, and the document has one lifecycle status from `pending` through `ready`. Processing retries transient failures. Check the document status and application logs when a job fails.
+The stages run sequentially, and the document has one main lifecycle status from `pending` through `ready`. Image-enrichment status is displayed separately so skipped or partial enrichment is not presented as full success. `enriched_at` is recorded only when that stage reaches a terminal outcome; it is not set while the work is merely queued, running, or waiting to retry.
 
 ## Tests and checks
 

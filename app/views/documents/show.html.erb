@@ -16,6 +16,11 @@
     </div>
     <div class="flex items-center gap-2 self-start flex-wrap">
       <span class="<%= status_badge_class(@document.status) %>"><%= @document.status %></span>
+      <% unless @document.enrichment_not_required? %>
+        <span class="<%= enrichment_status_badge_class(@document) %>">
+          Vision: <%= enrichment_status_label(@document) %>
+        </span>
+      <% end %>
       <%= link_to "Edit", edit_document_path(@document), class: "btn btn-ghost btn-sm" %>
       <%= button_to "Delete", @document, method: :delete,
             class: "btn btn-ghost btn-sm text-error",
@@ -54,6 +59,20 @@
         <p class="font-semibold">Document processing failed</p>
         <p class="text-sm"><%= @document.error_message %></p>
       </div>
+    </div>
+  <% end %>
+
+  <% if @document.enrichment_skipped? %>
+    <div class="alert alert-warning">
+      <span>Image enrichment was skipped because OpenAI Vision is not configured. Extracted text was preserved.</span>
+    </div>
+  <% elsif @document.enrichment_partial? %>
+    <div class="alert alert-warning">
+      <span>Some images could not be described. Extracted text and successful image descriptions were preserved.</span>
+    </div>
+  <% elsif @document.enrichment_failed? && !@document.failed? %>
+    <div class="alert alert-warning">
+      <span>Image enrichment could not be completed. Extracted text was preserved.</span>
     </div>
   <% end %>
 
