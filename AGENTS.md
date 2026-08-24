@@ -156,6 +156,7 @@ Performance may move higher only for a demonstrated bottleneck, clearly unsuitab
 
 ### Configuration, Secrets, And User Work
 
+- Do not run `git add`, create or amend commits or tags, push branches, or create/update pull requests unless the user explicitly requests that exact version-control action. A request to implement, fix, or finish a phase does not authorize committing or pushing; leave changes unstaged and report them.
 - Do not read, print, summarize, or copy values from real `.env` files or decrypted credentials unless explicitly asked to inspect those exact values.
 - `.env` and `config/master.key` must not be committed. `config/credentials.yml.enc` may be committed.
 - Use `.env.example` for variable names and non-secret placeholders only.
@@ -170,6 +171,8 @@ Performance may move higher only for a demonstrated bottleneck, clearly unsuitab
 ## Testing And Verification
 
 Every behavior change needs focused tests at the lowest useful layer.
+
+- Keep the Rails test suite single-process by default. Do not enable process-based parallel tests that create numbered `knowledge_service_test_*` databases unless the user explicitly requests parallel execution and approves the database lifecycle. Remove approved temporary worker databases when that run is complete.
 
 - Model changes: validations, associations, lifecycle methods, and edge cases.
 - Controller changes: success, validation failure, authentication, authorization, response status, and redirect/render behavior.

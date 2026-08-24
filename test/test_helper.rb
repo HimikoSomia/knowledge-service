@@ -5,8 +5,9 @@ require_relative "test_helpers/session_test_helper"
 
 module ActiveSupport
   class TestCase
-    # Run tests in parallel with specified workers
-    parallelize(workers: :number_of_processors)
+    # Process-based parallel tests leave numbered PostgreSQL databases behind.
+    # Keep the suite on the single configured test database by default.
+    parallelize(workers: 1)
 
     # Setup all fixtures in test/fixtures/*.yml for all tests in alphabetical order.
     fixtures :all
