@@ -9,6 +9,7 @@ This document is the durable index for the application-update phases. It records
 | 03 | Complete | Idempotent document processing, duplicate-delivery protection, and stale-generation rejection. |
 | 04 | Complete | Explicit enrichment outcomes for success, skipped configuration, partial image failure, transient retry, and exhausted retry. See [ADR 0001](decisions/0001-enrichment-outcome-semantics.md). |
 | 05 | Complete | Standardize production PostgreSQL configuration on discrete host, port, username, and password variables. See [ADR 0002](decisions/0002-production-database-environment.md). |
+| 06 | Complete | Enforce workspace validation and same-owner document/workspace joins, with controller and isolation coverage. See [ADR 0003](decisions/0003-workspace-ownership-integrity.md). |
 
 ## Phase 04 acceptance summary
 

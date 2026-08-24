@@ -83,6 +83,19 @@ class DocumentsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "Updated Title", documents(:pending_doc).reload.title
   end
 
+  test "update rejects another user's submitted workspace id" do
+    document = documents(:pending_doc)
+    other_workspace = workspaces(:workspace_two)
+
+    patch document_path(document), params: {
+      document: { title: document.title, workspace_ids: [ other_workspace.id ] }
+    }
+
+    assert_response :redirect
+    assert_empty document.reload.workspaces
+    assert_not DocumentWorkspace.exists?(document: document, workspace: other_workspace)
+  end
+
   test "destroy deletes document and redirects" do
     doc = documents(:pending_doc)
     assert_difference -> { @user.documents.count }, -1 do
