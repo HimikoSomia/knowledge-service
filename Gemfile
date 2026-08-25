@@ -72,7 +72,7 @@ gem "pagy", "~> 43.6"
 
 # Document extraction
 gem "csv"                         # Required by roo on Ruby 3.4+ (stdlib gem)
-gem "pdf-reader", "~> 2.0"       # Text extraction from native PDFs
+gem "pdf-reader", "~> 2.16"      # Text extraction from native PDFs
 gem "docx", "~> 0.8"             # DOCX paragraph/table parsing
 gem "roo", "~> 2.10"             # XLSX/XLS/CSV/ODS spreadsheet parsing
 gem "rubyzip", "~> 2.3"          # PPTX (ZIP-based XML) parsing; also a roo dependency
