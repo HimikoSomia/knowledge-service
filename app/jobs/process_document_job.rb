@@ -83,7 +83,21 @@ class ProcessDocumentJob < ApplicationJob
 
       if next_job
         job_id_for_failure = next_job.job_id
-        next_job.enqueue
+        begin
+          next_job.enqueue
+        rescue
+          document.update_current_processing!(
+            generation: generation,
+            job_id: next_job.job_id,
+            attributes: {
+              status: "failed",
+              processing_job_id: job_id,
+              processing_job_execution: executions
+            }
+          )
+          job_id_for_failure = job_id
+          raise
+        end
       end
 
       Rails.logger.info do

@@ -10,6 +10,7 @@ This document is the durable index for the application-update phases. It records
 | 04 | Complete | Explicit enrichment outcomes for success, skipped configuration, partial image failure, transient retry, and exhausted retry. See [ADR 0001](decisions/0001-enrichment-outcome-semantics.md). |
 | 05 | Complete | Standardize production PostgreSQL configuration on discrete host, port, username, and password variables. See [ADR 0002](decisions/0002-production-database-environment.md). |
 | 06 | Complete | Enforce workspace validation and same-owner document/workspace joins, with controller and isolation coverage. See [ADR 0003](decisions/0003-workspace-ownership-integrity.md). |
+| 07 | Complete | Add asynchronous grounded workspace Q&A with citation snapshots, neutral retrieval results, authenticated HTML/JSON resources, and duplicate-delivery protection. See [ADR 0004](decisions/0004-grounded-workspace-qa.md). |
 
 ## Phase 04 acceptance summary
 

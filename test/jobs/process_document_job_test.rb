@@ -127,4 +127,35 @@ class ProcessDocumentJobTest < ActiveJob::TestCase
     assert_empty @document.extracted_content
     assert_empty @document.document_chunks
   end
+
+  test "retry can reclaim extraction when embedding enqueue fails" do
+    unavailable_embedding_job = Object.new
+    unavailable_embedding_job.define_singleton_method(:job_id) { "unavailable-embedding-job" }
+    unavailable_embedding_job.define_singleton_method(:enqueue) { raise "queue unavailable" }
+    job = ProcessDocumentJob.new(@document.id, @document.processing_generation)
+
+    assert_enqueued_jobs 1, only: ProcessDocumentJob do
+      with_stubbed_embedding_job(unavailable_embedding_job) { job.perform_now }
+    end
+    clear_enqueued_jobs
+
+    @document.reload
+    assert_equal "failed", @document.status
+    assert_equal job.job_id, @document.processing_job_id
+
+    assert_enqueued_jobs 1, only: EmbedDocumentJob do
+      job.perform_now
+    end
+
+    assert_equal "embedding", @document.reload.status
+  end
+
+  private
+
+  def with_stubbed_embedding_job(job)
+    EmbedDocumentJob.define_singleton_method(:new) { |*| job }
+    yield
+  ensure
+    EmbedDocumentJob.singleton_class.remove_method(:new)
+  end
 end

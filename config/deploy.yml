@@ -43,6 +43,7 @@ env:
     - DB_HOST
     - DB_USERNAME
     - DB_PASSWORD
+    - OPENAI_API_KEY
   clear:
     # Run the Solid Queue Supervisor inside the web server's Puma process to do jobs.
     # When you start using multiple servers, you should split out job processing to a dedicated machine.
@@ -50,6 +51,14 @@ env:
 
     # All four production databases use DB_HOST and this PostgreSQL port.
     DB_PORT: <%= ENV.fetch("DB_PORT", 5432) %>
+
+    # Grounded workspace Q&A provider and retrieval limits.
+    OPENAI_ANSWER_MODEL: <%= ENV.fetch("OPENAI_ANSWER_MODEL", "gpt-4o-mini") %>
+    OPENAI_ANSWER_MAX_TOKENS: <%= ENV.fetch("OPENAI_ANSWER_MAX_TOKENS", 1200) %>
+    WORKSPACE_QA_CANDIDATE_LIMIT: <%= ENV.fetch("WORKSPACE_QA_CANDIDATE_LIMIT", 24) %>
+    WORKSPACE_QA_MAX_DISTANCE: <%= ENV.fetch("WORKSPACE_QA_MAX_DISTANCE", 0.55) %>
+    WORKSPACE_QA_MAX_CONTEXT_CHARS: <%= ENV.fetch("WORKSPACE_QA_MAX_CONTEXT_CHARS", 16000) %>
+    WORKSPACE_QA_MAX_RESULTS_PER_SOURCE: <%= ENV.fetch("WORKSPACE_QA_MAX_RESULTS_PER_SOURCE", 3) %>
 
     # Set number of processes dedicated to Solid Queue (default: 1)
     # JOB_CONCURRENCY: 3

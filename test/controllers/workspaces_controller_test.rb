@@ -11,6 +11,7 @@ class WorkspacesControllerTest < ActionDispatch::IntegrationTest
     get workspace_path(@workspace)
     assert_response :success
     assert_select "h1", @workspace.name
+    assert_select "form[action='#{workspace_questions_path(@workspace)}']"
   end
 
   test "create derives ownership from the current user" do

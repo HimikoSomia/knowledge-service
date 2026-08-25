@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_24_000002) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_25_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -116,6 +116,28 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_000002) do
     t.index ["email_address"], name: "index_users_on_email_address", unique: true
   end
 
+  create_table "workspace_questions", force: :cascade do |t|
+    t.text "answer"
+    t.integer "answer_job_execution", default: 0, null: false
+    t.string "answer_job_id"
+    t.string "answer_model"
+    t.datetime "answered_at"
+    t.jsonb "citations", default: [], null: false
+    t.datetime "created_at", null: false
+    t.string "error_code"
+    t.text "question", null: false
+    t.string "status", default: "pending", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.bigint "workspace_id", null: false
+    t.index ["status", "created_at"], name: "index_workspace_questions_on_status_and_created_at"
+    t.index ["user_id", "created_at"], name: "index_workspace_questions_on_user_id_and_created_at"
+    t.index ["user_id"], name: "index_workspace_questions_on_user_id"
+    t.index ["workspace_id", "created_at"], name: "index_workspace_questions_on_workspace_id_and_created_at"
+    t.index ["workspace_id"], name: "index_workspace_questions_on_workspace_id"
+    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'answering'::character varying, 'answered'::character varying, 'insufficient_context'::character varying, 'failed'::character varying]::text[])", name: "workspace_questions_status_check"
+  end
+
   create_table "workspaces", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "description"
@@ -132,5 +154,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_000002) do
   add_foreign_key "document_workspaces", "workspaces"
   add_foreign_key "documents", "users"
   add_foreign_key "sessions", "users"
+  add_foreign_key "workspace_questions", "users"
+  add_foreign_key "workspace_questions", "workspaces"
   add_foreign_key "workspaces", "users"
 end

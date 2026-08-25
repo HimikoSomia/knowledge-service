@@ -10,6 +10,7 @@ Knowledge Service is a Rails application for organizing user-owned workspaces an
 - Background extraction and chunking for documents, with OCR for images and sparse PDF pages when local tools are available.
 - Optional OpenAI embeddings stored in PostgreSQL/pgvector and cosine-similarity search limited to the current user's workspace.
 - Optional OpenAI Vision enrichment for image content that local OCR cannot read.
+- Asynchronous workspace Q&A grounded in retrieved knowledge, with persisted source citations and authenticated HTML/JSON responses.
 
 ## Supported documents
 
@@ -82,6 +83,12 @@ Copy [`.env.example`](.env.example) to `.env`; dotenv loads it in development an
 | `OPENAI_EMBEDDING_DIMENSIONS` | No | Must remain `1536` unless the `document_chunks.embedding` column is migrated to a different vector size. |
 | `OPENAI_EMBEDDING_BATCH_SIZE` | No | Number of chunks per embedding request; defaults to `100`. |
 | `OPENAI_VISION_MODEL` | No | Vision model for image descriptions; defaults to `gpt-4o-mini`. |
+| `OPENAI_ANSWER_MODEL` | No | Model used for grounded workspace answers; defaults to `gpt-4o-mini`. |
+| `OPENAI_ANSWER_MAX_TOKENS` | No | Maximum generated tokens per workspace answer; defaults to `1200`. |
+| `WORKSPACE_QA_CANDIDATE_LIMIT` | No | Candidate chunks considered before relevance and diversity filtering; defaults to `24`. |
+| `WORKSPACE_QA_MAX_DISTANCE` | No | Maximum cosine distance accepted as answer context; defaults to `0.55` and lower is more similar. |
+| `WORKSPACE_QA_MAX_CONTEXT_CHARS` | No | Maximum total characters supplied as answer context; defaults to `16000`. |
+| `WORKSPACE_QA_MAX_RESULTS_PER_SOURCE` | No | Maximum chunks contributed by one source; defaults to `3`. |
 
 Without `OPENAI_API_KEY`, document extraction and chunking still run, but the document remains `processed` rather than `ready`, so semantic search is unavailable. Image enrichment is also skipped. Development and production use local Active Storage by default; configure an S3 service in [`config/storage.yml`](config/storage.yml) and select it in the relevant environment before using object storage.
 
@@ -99,6 +106,27 @@ Without `OPENAI_API_KEY`, document extraction and chunking still run, but the do
 6. Workspace search embeds the query and returns only the signed-in user's embedded chunks that belong to that workspace.
 
 The stages run sequentially, and the document has one main lifecycle status from `pending` through `ready`. Image-enrichment status is displayed separately so skipped or partial enrichment is not presented as full success. `enriched_at` is recorded only when that stage reaches a terminal outcome; it is not set while the work is merely queued, running, or waiting to retry.
+
+## Grounded workspace Q&A
+
+The workspace page provides two related operations:
+
+- **Generate answer** creates a persisted question, retrieves relevant workspace chunks, and asynchronously generates an answer that must cite its sources.
+- **Search matching passages** exposes the existing semantic-search results directly without generating an answer.
+
+Question states progress from `pending` to `answering`, then to `answered`, `insufficient_context`, or `failed`. Retrieval is limited by user and workspace ownership in SQL, vector relevance, total context size, and per-source diversity. Retrieved content is treated as untrusted evidence: instructions found inside a document are not instructions for the answer provider.
+
+Phase 07 knowledge is still backed by ready document chunks. The answering boundary uses source-neutral retrieval results so future notes, memos, Git files, and project imports can join the workspace index without changing the answer generator. Generated answers are not automatically indexed as knowledge.
+
+Authenticated HTML and JSON resources use the same session boundary:
+
+```text
+POST /workspaces/:workspace_id/questions
+GET  /workspaces/:workspace_id/questions/:id
+GET  /workspaces/:workspace_id/questions
+```
+
+JSON creation returns `202 Accepted` when the answer job is queued. Clients can poll the returned question URL until it reaches a terminal status. This is a same-origin session API; external bearer tokens and CORS are not currently supported.
 
 ## Tests and checks
 
@@ -129,7 +157,7 @@ bin/ci
 The repository includes a production Dockerfile and Kamal configuration. Before deploying:
 
 1. Replace the placeholder server and registry settings in [`config/deploy.yml`](config/deploy.yml).
-2. Supply `RAILS_MASTER_KEY`, `DB_HOST`, `DB_USERNAME`, and `DB_PASSWORD` through `.kamal/secrets`. These values are injected as container secrets and must not be committed.
+2. Supply `RAILS_MASTER_KEY`, `DB_HOST`, `DB_USERNAME`, `DB_PASSWORD`, and `OPENAI_API_KEY` through `.kamal/secrets`. These values are injected as container secrets and must not be committed. The default Kamal template enables the OpenAI-backed features and therefore expects the key; remove its `config/deploy.yml` secret entry only when those features are intentionally disabled.
 3. Set `DB_PORT` in the deployment environment when PostgreSQL does not use port `5432`; Kamal passes it as a clear, non-secret variable.
 4. Ensure the PostgreSQL server hosts `knowledge_service_production`, `knowledge_service_production_cache`, `knowledge_service_production_queue`, and `knowledge_service_production_cable`, and provides the `vector` extension.
 

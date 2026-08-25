@@ -6,9 +6,11 @@ class WorkspacesController < ApplicationController
   end
 
   def show
+    prepare_question_ui
   end
 
   def search
+    prepare_question_ui
     @query = params[:q].to_s.strip
 
     if @query.present?
@@ -65,5 +67,10 @@ class WorkspacesController < ApplicationController
 
   def workspace_params
     params.require(:workspace).permit(:name, :description)
+  end
+
+  def prepare_question_ui
+    @workspace_question = @workspace.workspace_questions.new(user: Current.user)
+    @recent_questions = @workspace.workspace_questions.where(user: Current.user).recent_first.limit(5)
   end
 end
