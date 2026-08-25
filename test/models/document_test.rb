@@ -85,62 +85,6 @@ class DocumentTest < ActiveSupport::TestCase
     assert documents(:failed_doc).failed?
   end
 
-  test "mark_processing! sets status and processing_started_at" do
-    doc = documents(:pending_doc)
-    freeze_time do
-      doc.mark_processing!
-      assert_equal "processing", doc.reload.status
-      assert_in_delta Time.current, doc.processing_started_at, 1.second
-    end
-  end
-
-  test "record_extraction! stores chunk metadata without completing the pipeline" do
-    doc = documents(:pending_doc)
-    freeze_time do
-      doc.record_extraction!(5, "abc123")
-      doc.reload
-      assert_equal "pending", doc.status
-      assert_equal 5, doc.chunk_count
-      assert_equal "abc123", doc.file_checksum
-      assert_in_delta Time.current, doc.processed_at, 1.second
-      assert_nil doc.error_message
-    end
-  end
-
-  test "mark_ready! sets the final status and embedded timestamp" do
-    doc = documents(:pending_doc)
-    freeze_time do
-      doc.mark_ready!
-      assert_equal "ready", doc.reload.status
-      assert_in_delta Time.current, doc.embedded_at, 1.second
-    end
-  end
-
-  test "mark_failed! sets status and error_message" do
-    doc = documents(:pending_doc)
-    doc.mark_failed!("Something went wrong")
-    doc.reload
-    assert_equal "failed", doc.status
-    assert_equal "Something went wrong", doc.error_message
-  end
-
-  # --- Idempotency ---
-
-  test "already_processed_for? is true when ready with same checksum" do
-    doc = documents(:processed_doc)
-    assert doc.already_processed_for?("abc123")
-  end
-
-  test "already_processed_for? is false when checksum differs" do
-    doc = documents(:processed_doc)
-    assert_not doc.already_processed_for?("different")
-  end
-
-  test "already_processed_for? is false when not yet processed" do
-    doc = documents(:pending_doc)
-    assert_not doc.already_processed_for?("abc123")
-  end
-
   # --- Job enqueueing ---
 
   test "enqueues ProcessDocumentJob after create" do

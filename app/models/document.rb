@@ -110,47 +110,6 @@ class Document < ApplicationRecord
     )
   end
 
-  def mark_processing!
-    update_columns(status: "processing", processing_started_at: Time.current, error_message: nil)
-  end
-
-  def record_extraction!(chunk_count_value, checksum)
-    update_columns(
-      processed_at: Time.current,
-      chunk_count: chunk_count_value,
-      file_checksum: checksum,
-      error_message: nil
-    )
-  end
-
-  def mark_enriching!
-    update_columns(status: "enriching")
-  end
-
-  def mark_enriched!
-    update_columns(enriched_at: Time.current)
-  end
-
-  def mark_embedding!
-    update_columns(status: "embedding")
-  end
-
-  def mark_processed!
-    update_columns(status: "processed")
-  end
-
-  def mark_ready!
-    update_columns(status: "ready", embedded_at: Time.current, error_message: nil)
-  end
-
-  def mark_failed!(message)
-    update_columns(status: "failed", error_message: message.to_s.truncate(1000))
-  end
-
-  def already_processed_for?(checksum)
-    (processed? || ready?) && file_checksum == checksum
-  end
-
   private
 
   def detect_document_type
