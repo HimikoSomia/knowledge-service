@@ -5,6 +5,7 @@ class WorkspaceQuestionsControllerTest < ActionDispatch::IntegrationTest
     @user = users(:one)
     @workspace = workspaces(:workspace_one)
     sign_in_as(@user)
+    WorkspaceQuestionsController.cache_store.clear
   end
 
   test "creates an owned question and queues its answer" do
@@ -31,6 +32,18 @@ class WorkspaceQuestionsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "pending", payload["status"]
     assert_equal "What is documented?", payload["question"]
     assert_equal @workspace.id, payload["workspace_id"]
+  end
+
+  test "lists owned questions through JSON" do
+    own_question = @workspace.workspace_questions.create!(user: @user, question: "Owned question")
+    workspaces(:workspace_two).workspace_questions.create!(user: users(:two), question: "Private question")
+
+    get workspace_questions_path(@workspace, format: :json)
+
+    assert_response :success
+    ids = response.parsed_body.pluck("id")
+    assert_includes ids, own_question.id
+    assert_equal @workspace.workspace_questions.count, ids.size
   end
 
   test "rejects a blank question in HTML" do
@@ -76,6 +89,21 @@ class WorkspaceQuestionsControllerTest < ActionDispatch::IntegrationTest
     assert_match "Processed Document", response.body
   end
 
+  test "shows retry action for a failed question" do
+    question = @workspace.workspace_questions.create!(
+      user: @user,
+      question: "Why did this fail?",
+      status: "failed",
+      error_code: "provider_unavailable"
+    )
+
+    get workspace_question_path(@workspace, question)
+
+    assert_response :success
+    assert_select "form[action='#{workspace_question_retry_path(@workspace, question)}']"
+    assert_select "button", "Retry answer"
+  end
+
   test "shows a question as JSON" do
     question = answered_question
 
@@ -105,6 +133,48 @@ class WorkspaceQuestionsControllerTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
+  test "JSON API requires an authenticated session" do
+    sign_out
+
+    post workspace_questions_path(@workspace),
+         params: { workspace_question: { question: "Unauthenticated" } },
+         as: :json
+
+    assert_redirected_to new_session_path
+  end
+
+  test "returns service unavailable when answer enqueue fails" do
+    unavailable_job = Object.new
+    unavailable_job.define_singleton_method(:job_id) { "unavailable-answer-job" }
+    unavailable_job.define_singleton_method(:enqueue) { raise "queue unavailable" }
+
+    with_stubbed_answer_job(unavailable_job) do
+      post workspace_questions_path(@workspace),
+           params: { workspace_question: { question: "Will this queue?" } },
+           as: :json
+    end
+
+    assert_response :service_unavailable
+    assert_equal "failed", response.parsed_body["status"]
+    assert_equal "queue_unavailable", response.parsed_body["error_code"]
+  end
+
+  test "rate limits JSON question creation" do
+    10.times do |index|
+      post workspace_questions_path(@workspace),
+           params: { workspace_question: { question: "Question #{index}" } },
+           as: :json
+      assert_response :accepted
+    end
+
+    post workspace_questions_path(@workspace),
+         params: { workspace_question: { question: "One too many" } },
+         as: :json
+
+    assert_response :too_many_requests
+    assert_equal "rate_limited", response.parsed_body["error"]
+  end
+
   private
 
   def answered_question
@@ -128,5 +198,12 @@ class WorkspaceQuestionsControllerTest < ActionDispatch::IntegrationTest
         }
       ]
     )
+  end
+
+  def with_stubbed_answer_job(job)
+    AnswerWorkspaceQuestionJob.define_singleton_method(:new) { |*| job }
+    yield
+  ensure
+    AnswerWorkspaceQuestionJob.singleton_class.remove_method(:new)
   end
 end

@@ -15,7 +15,9 @@ Rails.application.routes.draw do
   # root "posts#index"
   root "workspaces#index"
   resources :workspaces do
-    resources :questions, controller: "workspace_questions", only: %i[index show create]
+    resources :questions, controller: "workspace_questions", only: %i[index show create] do
+      resource :retry, controller: "workspace_question_retries", only: :create
+    end
     member do
       get :search
     end

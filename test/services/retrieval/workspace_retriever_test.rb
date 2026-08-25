@@ -56,15 +56,29 @@ class Retrieval::WorkspaceRetrieverTest < ActiveSupport::TestCase
     assert_nil search.workspace_id
   end
 
+  test "does not exceed the configured context budget" do
+    ENV["WORKSPACE_QA_MAX_CONTEXT_CHARS"] = "35"
+    chunks = [
+      fake_chunk(id: 1, distance: 0.1, content: "a" * 25),
+      fake_chunk(id: 2, document_id: 11, distance: 0.2, content: "b" * 20)
+    ]
+
+    results = Retrieval::WorkspaceRetriever.new(@user, @workspace, search_service: fake_search(chunks))
+      .retrieve("question")
+
+    assert_equal [ 1 ], results.map(&:chunk_id)
+    assert_operator results.sum { |result| result.content.length }, :<=, 35
+  end
+
   private
 
-  def fake_chunk(id:, document_id: 10, distance:, page_number: nil)
+  def fake_chunk(id:, document_id: 10, distance:, page_number: nil, content: nil)
     FakeChunk.new(
       id: id,
       document_id: document_id,
       document: FakeDocument.new(id: document_id, title: "Source document"),
       chunk_index: id,
-      content: "Relevant workspace content #{id}",
+      content: content || "Relevant workspace content #{id}",
       page_number: page_number,
       metadata: {},
       neighbor_distance: distance

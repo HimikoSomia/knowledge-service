@@ -20,33 +20,11 @@ class WorkspaceQuestion < ApplicationRecord
   scope :recent_first, -> { order(created_at: :desc) }
 
   def enqueue_answer!
-    job = AnswerWorkspaceQuestionJob.new(id)
+    enqueue_answer_from!("pending")
+  end
 
-    with_lock do
-      return false unless pending? || failed?
-
-      update_columns(
-        status: "pending",
-        answer: nil,
-        citations: [],
-        answer_model: nil,
-        error_code: nil,
-        answered_at: nil,
-        answer_job_id: job.job_id,
-        answer_job_execution: 0
-      )
-    end
-
-    job.enqueue
-    true
-  rescue => e
-    with_lock do
-      if answer_job_id == job&.job_id
-        update_columns(status: "failed", error_code: "queue_unavailable")
-      end
-    end
-    Rails.logger.error "WorkspaceQuestion #{id} answer enqueue failed (#{e.class})"
-    false
+  def retry_answer!
+    enqueue_answer_from!("failed")
   end
 
   def claim_answering!(job_id:, execution:)
@@ -97,6 +75,36 @@ class WorkspaceQuestion < ApplicationRecord
   end
 
   private
+
+  def enqueue_answer_from!(required_status)
+    job = AnswerWorkspaceQuestionJob.new(id)
+
+    with_lock do
+      return false unless status == required_status
+
+      update_columns(
+        status: "pending",
+        answer: nil,
+        citations: [],
+        answer_model: nil,
+        error_code: nil,
+        answered_at: nil,
+        answer_job_id: job.job_id,
+        answer_job_execution: 0
+      )
+    end
+
+    job.enqueue
+    true
+  rescue => e
+    with_lock do
+      if answer_job_id == job&.job_id
+        update_columns(status: "failed", error_code: "queue_unavailable")
+      end
+    end
+    Rails.logger.error "WorkspaceQuestion #{id} answer enqueue failed (#{e.class})"
+    false
+  end
 
   def workspace_and_user_have_same_owner
     return if workspace.blank? || user.blank?

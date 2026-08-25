@@ -59,6 +59,21 @@ class WorkspaceQuestionTest < ActiveSupport::TestCase
     assert_not_nil question.answered_at
   end
 
+  test "retries only a failed question and queues one new job" do
+    question = create_question
+    assert_no_enqueued_jobs { assert_not question.retry_answer! }
+
+    question.update_columns(status: "failed", error_code: "provider_unavailable")
+    assert_enqueued_jobs 1, only: AnswerWorkspaceQuestionJob do
+      assert question.retry_answer!
+    end
+
+    question.reload
+    assert question.pending?
+    assert_nil question.error_code
+    assert question.answer_job_id.present?
+  end
+
   private
 
   def create_question

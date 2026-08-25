@@ -116,6 +116,8 @@ The workspace page provides two related operations:
 
 Question states progress from `pending` to `answering`, then to `answered`, `insufficient_context`, or `failed`. Retrieval is limited by user and workspace ownership in SQL, vector relevance, total context size, and per-source diversity. Retrieved content is treated as untrusted evidence: instructions found inside a document are not instructions for the answer provider.
 
+Failed questions display a **Retry answer** action. Retrying clears the previous safe error state, creates one new answer-job claim, and returns the question to `pending`; questions in any other state cannot be retried.
+
 Phase 07 knowledge is still backed by ready document chunks. The answering boundary uses source-neutral retrieval results so future notes, memos, Git files, and project imports can join the workspace index without changing the answer generator. Generated answers are not automatically indexed as knowledge.
 
 Authenticated HTML and JSON resources use the same session boundary:
@@ -124,6 +126,7 @@ Authenticated HTML and JSON resources use the same session boundary:
 POST /workspaces/:workspace_id/questions
 GET  /workspaces/:workspace_id/questions/:id
 GET  /workspaces/:workspace_id/questions
+POST /workspaces/:workspace_id/questions/:question_id/retry
 ```
 
 JSON creation returns `202 Accepted` when the answer job is queued. Clients can poll the returned question URL until it reaches a terminal status. This is a same-origin session API; external bearer tokens and CORS are not currently supported.

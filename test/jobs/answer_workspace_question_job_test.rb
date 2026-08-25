@@ -86,6 +86,27 @@ class AnswerWorkspaceQuestionJobTest < ActiveJob::TestCase
     assert_equal job.job_id, @question.answer_job_id
   end
 
+  test "exhausted transient retries record a safe terminal failure" do
+    job = build_job(
+      contexts: [ context ],
+      answer_error: Answering::OpenAiAnswerService::TransientError.new
+    )
+    retry_key = [
+      Retrieval::WorkspaceRetriever::TransientError,
+      Answering::OpenAiAnswerService::TransientError
+    ].to_s
+    job.exception_executions[retry_key] = 4
+
+    assert_no_enqueued_jobs do
+      assert_nothing_raised { job.perform_now }
+    end
+
+    @question.reload
+    assert @question.failed?
+    assert_equal "provider_unavailable", @question.error_code
+    assert_nil @question.answer_job_id
+  end
+
   private
 
   def build_job(contexts:, answer: nil, answer_error: nil, answer_calls: nil, insufficient_context: false)

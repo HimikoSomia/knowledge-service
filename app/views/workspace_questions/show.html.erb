@@ -49,5 +49,11 @@
     <div class="alert alert-error">
       <span><%= workspace_question_error_message(@workspace_question) %></span>
     </div>
+    <div class="flex justify-end">
+      <%= button_to "Retry answer",
+                    workspace_question_retry_path(@workspace, @workspace_question),
+                    method: :post,
+                    class: "btn btn-primary" %>
+    </div>
   <% end %>
 </div>
