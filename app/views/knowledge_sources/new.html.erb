@@ -1,0 +1,13 @@
+<% content_for :title, "Add workspace knowledge" %>
+
+<div class="mx-auto max-w-3xl space-y-6">
+  <div>
+    <%= link_to "← Back to #{@workspace.name}", workspace_path(@workspace), class: "link link-hover text-sm" %>
+    <h1 class="mt-3 text-2xl font-bold">Add workspace knowledge</h1>
+    <p class="mt-1 text-sm text-base-content/60">Create a note or memo that grounded answers can cite.</p>
+  </div>
+
+  <div class="rounded-lg border border-base-300 bg-base-100 p-6">
+    <%= render "form", workspace: @workspace, knowledge_source: @knowledge_source %>
+  </div>
+</div>

@@ -1,6 +1,6 @@
 # Knowledge Service
 
-Knowledge Service is a Rails application for organizing user-owned workspaces and uploaded documents. It extracts document content into searchable chunks, optionally enriches images with OpenAI Vision, generates OpenAI embeddings, and provides workspace-scoped semantic search.
+Knowledge Service is a Rails application for organizing user-owned workspaces, uploaded documents, notes, and memos. It turns workspace content into searchable chunks, optionally enriches document images with OpenAI Vision, generates OpenAI embeddings, and provides workspace-scoped semantic search and grounded answers.
 
 ## Features
 
@@ -10,6 +10,7 @@ Knowledge Service is a Rails application for organizing user-owned workspaces an
 - Background extraction and chunking for documents, with OCR for images and sparse PDF pages when local tools are available.
 - Optional OpenAI embeddings stored in PostgreSQL/pgvector and cosine-similarity search limited to the current user's workspace.
 - Optional OpenAI Vision enrichment for image content that local OCR cannot read.
+- User-authored workspace notes and memos with background indexing.
 - Asynchronous workspace Q&A grounded in retrieved knowledge, with persisted source citations and authenticated HTML/JSON responses.
 
 ## Supported documents
@@ -90,7 +91,7 @@ Copy [`.env.example`](.env.example) to `.env`; dotenv loads it in development an
 | `WORKSPACE_QA_MAX_CONTEXT_CHARS` | No | Maximum total characters supplied as answer context; defaults to `16000`. |
 | `WORKSPACE_QA_MAX_RESULTS_PER_SOURCE` | No | Maximum chunks contributed by one source; defaults to `3`. |
 
-Without `OPENAI_API_KEY`, document extraction and chunking still run, but the document remains `processed` rather than `ready`, so semantic search is unavailable. Image enrichment is also skipped. Development and production use local Active Storage by default; configure an S3 service in [`config/storage.yml`](config/storage.yml) and select it in the relevant environment before using object storage.
+Without `OPENAI_API_KEY`, document extraction and chunking still run, but the document remains `processed` rather than `ready`, so semantic search is unavailable. Image enrichment is also skipped, and authored notes or memos remain stored as `unindexed`. Development and production use local Active Storage by default; configure an S3 service in [`config/storage.yml`](config/storage.yml) and select it in the relevant environment before using object storage.
 
 ## How processing works
 
@@ -111,14 +112,18 @@ The stages run sequentially, and the document has one main lifecycle status from
 
 The workspace page provides two related operations:
 
-- **Generate answer** creates a persisted question, retrieves relevant workspace chunks, and asynchronously generates an answer that must cite its sources.
-- **Search matching passages** exposes the existing semantic-search results directly without generating an answer.
+- **Generate answer** creates a persisted question, retrieves relevant document, note, and memo chunks, and asynchronously generates an answer that must cite its sources.
+- **Search matching passages** exposes the same kinds of workspace evidence directly without generating an answer.
 
 Question states progress from `pending` to `answering`, then to `answered`, `insufficient_context`, or `failed`. Retrieval is limited by user and workspace ownership in SQL, vector relevance, total context size, and per-source diversity. Retrieved content is treated as untrusted evidence: instructions found inside a document are not instructions for the answer provider.
 
 Failed questions display a **Retry answer** action. Retrying clears the previous safe error state, creates one new answer-job claim, and returns the question to `pending`; questions in any other state cannot be retried.
 
-Phase 07 knowledge is still backed by ready document chunks. The answering boundary uses source-neutral retrieval results so future notes, memos, Git files, and project imports can join the workspace index without changing the answer generator. Generated answers are not automatically indexed as knowledge.
+Notes and memos can be created from the workspace page. They move from `pending` to `indexing`, then to `ready`, `unindexed`, or `failed`. Missing embedding configuration leaves the authored content safely stored as `unindexed`; editing and saving it again queues a new indexing generation. Only `ready` sources participate in retrieval.
+
+Phase 08 embeds each query once and merges ownership-scoped document and manual-source candidates before applying relevance, source-diversity, result-count, and context-size limits. Generated answers are outputs and are not automatically indexed as knowledge.
+
+Git repositories and project-system imports are intentionally deferred. They require separate credential, allowlist, synchronization, deletion, and secret-handling policies rather than being treated as arbitrary trusted text.
 
 Authenticated HTML and JSON resources use the same session boundary:
 
@@ -130,6 +135,8 @@ POST /workspaces/:workspace_id/questions/:question_id/retry
 ```
 
 JSON creation returns `202 Accepted` when the answer job is queued. Clients can poll the returned question URL until it reaches a terminal status. This is a same-origin session API; external bearer tokens and CORS are not currently supported.
+
+User-authored knowledge currently uses authenticated HTML CRUD routes nested beneath a workspace. A separate knowledge-source JSON API is not part of Phase 08.
 
 ## Tests and checks
 
@@ -144,6 +151,8 @@ Useful focused checks:
 ```sh
 bin/rails test test/services/extraction/extractors_test.rb
 bin/rails test test/services/retrieval/document_search_service_test.rb
+bin/rails test test/services/retrieval/workspace_knowledge_search_service_test.rb
+bin/rails test test/controllers/knowledge_sources_controller_test.rb
 bin/rubocop
 bin/brakeman
 bin/bundler-audit

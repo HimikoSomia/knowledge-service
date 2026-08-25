@@ -1,0 +1,17 @@
+note_one_chunk:
+  knowledge_source: note_one
+  chunk_index: 0
+  content: "The launch review is scheduled for Friday."
+  content_checksum: "notechecksum001"
+  token_count: 11
+  metadata:
+    locator: "Section 1"
+
+memo_two_chunk:
+  knowledge_source: memo_two
+  chunk_index: 0
+  content: "This memo belongs only to the second user."
+  content_checksum: "memochecksum002"
+  token_count: 12
+  metadata:
+    locator: "Section 1"

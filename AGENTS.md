@@ -21,7 +21,7 @@ Ask a focused question when an assumption would materially affect public behavio
 
 ## Application And Repository Map
 
-`knowledge-service` is a Ruby on Rails 8.1 application for organizing user-owned workspaces and uploaded documents. It extracts content into searchable chunks, optionally enriches images with OpenAI Vision, creates OpenAI embeddings, and provides workspace-scoped semantic search.
+`knowledge-service` is a Ruby on Rails 8.1 application for organizing user-owned workspaces, uploaded documents, notes, and memos. It turns content into searchable chunks, optionally enriches document images with OpenAI Vision, creates OpenAI embeddings, and provides workspace-scoped semantic search and grounded answers.
 
 ```text
 Browser -> Router -> Controller -> Model / Service -> PostgreSQL / Active Storage / provider
@@ -60,6 +60,7 @@ The root checklist always applies. Combine rows when a change spans areas.
 | Routes, REST shape, status codes, or redirects | `config/routes.rb`, affected controller, views, and controller tests |
 | Authentication, sessions, password reset, or public access | `app/controllers/concerns/authentication.rb`, session/password controllers, `app/models/current.rb`, `app/models/session.rb`, related tests |
 | Workspaces, ownership, or workspace search | Workspace controller/model/service, retrieval service, related views and tests |
+| Notes, memos, or manual knowledge indexing | `KnowledgeSource`, `KnowledgeChunk`, knowledge-source controller/views, `IndexKnowledgeSourceJob`, text splitter, combined workspace search, related tests |
 | Documents, uploads, or workspace assignment | Document controller/model, `DocumentWorkspace`, Active Storage attachment behavior, related views and tests |
 | Extraction, OCR, chunking, or supported file types | `app/services/extraction/`, `app/services/chunking/`, `ProcessDocumentJob`, document model, fixtures, README, related tests |
 | Enrichment, embeddings, vector search, or processing lifecycle | Enrichment/embedding/retrieval services, all document-processing jobs, document/chunk models, vector migrations/schema, `.env.example`, README, related tests |

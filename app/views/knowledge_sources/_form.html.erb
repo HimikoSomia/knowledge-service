@@ -1,0 +1,43 @@
+<%= form_with model: [ workspace, knowledge_source ], class: "space-y-5" do |form| %>
+  <% if knowledge_source.errors.any? %>
+    <div id="error_explanation" class="alert alert-error">
+      <ul class="list-disc pl-5">
+        <% knowledge_source.errors.full_messages.each do |message| %>
+          <li><%= message %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div>
+    <%= form.label :source_type, "Type", class: "label" %>
+    <%= form.select :source_type,
+          KnowledgeSource.source_types.keys.map { |type| [ type.humanize, type ] },
+          {},
+          class: "select select-bordered w-full" %>
+  </div>
+
+  <div>
+    <%= form.label :title, class: "label" %>
+    <%= form.text_field :title,
+          maxlength: KnowledgeSource::MAX_TITLE_LENGTH,
+          class: "input input-bordered w-full",
+          required: true %>
+  </div>
+
+  <div>
+    <%= form.label :content, class: "label" %>
+    <%= form.text_area :content,
+          rows: 14,
+          maxlength: KnowledgeSource::MAX_CONTENT_LENGTH,
+          class: "textarea textarea-bordered w-full font-mono text-sm",
+          placeholder: "Add facts, decisions, context, or reminders for this workspace.",
+          required: true %>
+    <p class="mt-1 text-xs text-base-content/50">This content becomes searchable after background indexing completes.</p>
+  </div>
+
+  <div class="flex justify-end gap-2">
+    <%= link_to "Cancel", workspace_path(workspace), class: "btn btn-ghost" %>
+    <%= form.submit class: "btn btn-primary" %>
+  </div>
+<% end %>

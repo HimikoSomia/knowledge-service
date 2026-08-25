@@ -19,7 +19,7 @@ class Retrieval::WorkspaceRetriever
   DEFAULT_MAX_CONTEXT_CHARS = 16_000
   DEFAULT_MAX_RESULTS_PER_SOURCE = 3
 
-  def initialize(user, workspace, search_service: Retrieval::DocumentSearchService.new(user))
+  def initialize(user, workspace, search_service: Retrieval::WorkspaceKnowledgeSearchService.new(user))
     @user = user
     @workspace = workspace
     @search_service = search_service
@@ -36,7 +36,8 @@ class Retrieval::WorkspaceRetriever
     candidates(question).each do |chunk|
       distance = chunk.neighbor_distance.to_f
       next if distance > max_distance
-      next if source_counts[chunk.document_id] >= max_results_per_source
+      source_key = [ chunk.source_type, chunk.source_id ]
+      next if source_counts[source_key] >= max_results_per_source
       break if results.size >= limit
 
       content = chunk.content.to_s.strip
@@ -44,12 +45,12 @@ class Retrieval::WorkspaceRetriever
       next if context_chars + content.length > max_context_chars
 
       results << build_result(chunk, distance)
-      source_counts[chunk.document_id] += 1
+      source_counts[source_key] += 1
       context_chars += content.length
     end
 
     results
-  rescue Retrieval::DocumentSearchService::NotConfiguredError,
+  rescue Retrieval::WorkspaceKnowledgeSearchService::NotConfiguredError,
          Embedding::OpenAiEmbeddingService::ConfigurationError => e
     raise ConfigurationError, e.message
   rescue Embedding::OpenAiEmbeddingService::RateLimitError,
@@ -66,29 +67,20 @@ class Retrieval::WorkspaceRetriever
       question.to_s.strip,
       workspace_id: workspace.id,
       limit: candidate_limit
-    ).includes(:document)
+    )
   end
 
   def build_result(chunk, distance)
     Result.new(
-      chunk_id: chunk.id,
+      chunk_id: chunk.chunk_id,
       content: chunk.content,
-      source_type: "document",
-      source_id: chunk.document_id,
-      source_title: chunk.document.title,
-      source_locator: locator_for(chunk),
+      source_type: chunk.source_type,
+      source_id: chunk.source_id,
+      source_title: chunk.source_title,
+      source_locator: chunk.source_locator,
       metadata: chunk.metadata,
       distance: distance
     )
-  end
-
-  def locator_for(chunk)
-    return "Page #{chunk.page_number}" if chunk.page_number.present?
-
-    heading = chunk.metadata.dig("heading", "content").presence
-    return heading if heading
-
-    "Chunk #{chunk.chunk_index + 1}"
   end
 
   def candidate_limit

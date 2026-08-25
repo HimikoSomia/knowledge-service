@@ -12,6 +12,7 @@ class WorkspacesControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "h1", @workspace.name
     assert_select "form[action='#{workspace_questions_path(@workspace)}']"
+    assert_select "a[href='#{new_workspace_knowledge_source_path(@workspace)}']", text: "Add knowledge"
   end
 
   test "create derives ownership from the current user" do
@@ -61,6 +62,30 @@ class WorkspacesControllerTest < ActionDispatch::IntegrationTest
     assert_match "Search is not available", response.body
   ensure
     ENV["OPENAI_API_KEY"] = "test-key"
+  end
+
+  test "search renders indexed manual knowledge" do
+    source = knowledge_sources(:note_one)
+    source.knowledge_chunks.first.update_columns(
+      embedding: Array.new(Embedding::OpenAiEmbeddingService::DB_DIMENSIONS, 1.0),
+      embedding_model: "text-embedding-3-small"
+    )
+    service = Object.new
+    service.define_singleton_method(:configured?) { true }
+    service.define_singleton_method(:model) { "text-embedding-3-small" }
+    service.define_singleton_method(:embed_texts) do |_texts|
+      [ Array.new(Embedding::OpenAiEmbeddingService::DB_DIMENSIONS, 1.0) ]
+    end
+    Embedding::OpenAiEmbeddingService.define_singleton_method(:new) { service }
+    get search_workspace_path(@workspace), params: { q: "launch review" }
+
+    assert_response :success
+    assert_select "a", text: source.title
+    assert_match source.content, response.body
+  ensure
+    if Embedding::OpenAiEmbeddingService.singleton_class.method_defined?(:new, false)
+      Embedding::OpenAiEmbeddingService.singleton_class.remove_method(:new)
+    end
   end
 
   test "cannot access another user's workspace" do

@@ -12,8 +12,10 @@ module ApplicationHelper
       case status
       when "processed", "ready"
         "badge-success"
-      when "processing", "enriching", "embedding"
+      when "processing", "enriching", "embedding", "indexing"
         "badge-info"
+      when "unindexed"
+        "badge-warning"
       when "failed", "error"
         "badge-error"
       else

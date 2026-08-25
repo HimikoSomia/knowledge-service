@@ -1,14 +1,7 @@
 require "test_helper"
 
 class Retrieval::WorkspaceRetrieverTest < ActiveSupport::TestCase
-  FakeCollection = Class.new(Array) do
-    def includes(*) = self
-  end
-
-  FakeDocument = Data.define(:id, :title)
-  FakeChunk = Data.define(
-    :id, :document_id, :document, :chunk_index, :content, :page_number, :metadata, :neighbor_distance
-  )
+  FakeChunk = Retrieval::WorkspaceKnowledgeSearchService::Candidate
 
   setup do
     @user = users(:one)
@@ -33,13 +26,26 @@ class Retrieval::WorkspaceRetrieverTest < ActiveSupport::TestCase
     assert_equal "Page 4", result.source_locator
   end
 
+  test "preserves note source identity in neutral results" do
+    search = fake_search([
+      fake_chunk(id: 8, source_type: "note", source_id: 22, source_title: "Launch note")
+    ])
+
+    result = Retrieval::WorkspaceRetriever.new(@user, @workspace, search_service: search)
+      .retrieve("What happened?").first
+
+    assert_equal "note", result.source_type
+    assert_equal 22, result.source_id
+    assert_equal "Launch note", result.source_title
+  end
+
   test "filters weak matches and limits repeated chunks from one source" do
     ENV["WORKSPACE_QA_MAX_DISTANCE"] = "0.4"
     ENV["WORKSPACE_QA_MAX_RESULTS_PER_SOURCE"] = "1"
     chunks = [
-      fake_chunk(id: 1, document_id: 10, distance: 0.1),
-      fake_chunk(id: 2, document_id: 10, distance: 0.2),
-      fake_chunk(id: 3, document_id: 11, distance: 0.8)
+      fake_chunk(id: 1, source_id: 10, distance: 0.1),
+      fake_chunk(id: 2, source_id: 10, distance: 0.2),
+      fake_chunk(id: 3, source_id: 11, distance: 0.8)
     ]
 
     results = Retrieval::WorkspaceRetriever.new(@user, @workspace, search_service: fake_search(chunks))
@@ -60,7 +66,7 @@ class Retrieval::WorkspaceRetrieverTest < ActiveSupport::TestCase
     ENV["WORKSPACE_QA_MAX_CONTEXT_CHARS"] = "35"
     chunks = [
       fake_chunk(id: 1, distance: 0.1, content: "a" * 25),
-      fake_chunk(id: 2, document_id: 11, distance: 0.2, content: "b" * 20)
+      fake_chunk(id: 2, source_id: 11, distance: 0.2, content: "b" * 20)
     ]
 
     results = Retrieval::WorkspaceRetriever.new(@user, @workspace, search_service: fake_search(chunks))
@@ -72,14 +78,15 @@ class Retrieval::WorkspaceRetrieverTest < ActiveSupport::TestCase
 
   private
 
-  def fake_chunk(id:, document_id: 10, distance:, page_number: nil, content: nil)
+  def fake_chunk(id:, source_type: "document", source_id: 10, source_title: "Source document",
+                 distance: 0.2, page_number: nil, content: nil)
     FakeChunk.new(
-      id: id,
-      document_id: document_id,
-      document: FakeDocument.new(id: document_id, title: "Source document"),
-      chunk_index: id,
+      chunk_id: id,
       content: content || "Relevant workspace content #{id}",
-      page_number: page_number,
+      source_type: source_type,
+      source_id: source_id,
+      source_title: source_title,
+      source_locator: page_number ? "Page #{page_number}" : "Chunk #{id + 1}",
       metadata: {},
       neighbor_distance: distance
     )
@@ -90,7 +97,7 @@ class Retrieval::WorkspaceRetrieverTest < ActiveSupport::TestCase
       service.define_singleton_method(:search) do |_, workspace_id:, limit:|
         @workspace_id = workspace_id
         @limit = limit
-        FakeCollection.new(chunks)
+        chunks
       end
       service.define_singleton_method(:workspace_id) { @workspace_id }
     end

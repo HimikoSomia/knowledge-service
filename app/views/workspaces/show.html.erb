@@ -67,10 +67,55 @@
     </div>
   <% end %>
 
+  <%# User-authored knowledge sources %>
+  <div class="rounded-lg border border-base-300 bg-base-100">
+    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-base-300 px-4 py-3">
+      <div>
+        <h2 class="text-sm font-semibold text-base-content">Notes and memos</h2>
+        <p class="text-xs text-base-content/50">Add workspace context that grounded answers can retrieve and cite.</p>
+      </div>
+      <%= link_to "Add knowledge", new_workspace_knowledge_source_path(@workspace), class: "btn btn-primary btn-sm" %>
+    </div>
+
+    <% if @knowledge_sources.any? %>
+      <div class="divide-y divide-base-300">
+        <% @knowledge_sources.each do |source| %>
+          <div class="flex items-center justify-between gap-4 px-4 py-3">
+            <div class="min-w-0">
+              <%= link_to source.title,
+                    edit_workspace_knowledge_source_path(@workspace, source),
+                    class: "block truncate text-sm font-medium hover:text-primary" %>
+              <p class="mt-0.5 text-xs text-base-content/50">
+                <%= source.source_type.humanize %>
+                <% if source.unindexed? %>
+                  &middot; Configure embeddings, then edit and save to retry.
+                <% elsif source.failed? %>
+                  &middot; Indexing failed. Edit and save to retry.
+                <% end %>
+              </p>
+            </div>
+            <div class="flex shrink-0 items-center gap-2">
+              <span class="<%= status_badge_class(source.status) %>"><%= source.status.humanize %></span>
+              <%= button_to "Remove",
+                    workspace_knowledge_source_path(@workspace, source),
+                    method: :delete,
+                    class: "btn btn-ghost btn-xs",
+                    form: { data: { turbo_confirm: "Remove this knowledge source?" } } %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    <% else %>
+      <div class="px-4 py-8 text-center text-sm text-base-content/60">
+        No notes or memos yet.
+      </div>
+    <% end %>
+  </div>
+
   <%# Direct semantic search form %>
   <div class="rounded-lg border border-base-300 bg-base-100 p-5">
     <h2 class="text-sm font-semibold text-base-content">Search matching passages</h2>
-    <p class="mb-3 text-sm text-base-content/60">Inspect retrieved document excerpts without generating an answer.</p>
+    <p class="mb-3 text-sm text-base-content/60">Inspect retrieved document, note, and memo excerpts without generating an answer.</p>
     <%= form_with url: search_workspace_path(@workspace), method: :get, local: true, class: "flex gap-2" do |f| %>
       <%= f.text_field :q,
             value: @query,
@@ -102,33 +147,40 @@
         <% end %>
       </h2>
 
-      <% @results.each_with_index do |chunk, idx| %>
+      <% @results.each do |result| %>
         <div class="rounded-lg border border-base-300 bg-base-100 p-4">
           <div class="flex items-center justify-between text-xs text-base-content/50 mb-2">
             <div class="flex items-center gap-3">
               <span class="font-semibold text-base-content/70">
-                <%= link_to chunk.document.title, document_path(chunk.document), class: "hover:text-primary" %>
+                <% if result.source_type == "document" %>
+                  <%= link_to result.source_title, document_path(result.source_id), class: "hover:text-primary" %>
+                <% elsif KnowledgeSource.source_types.key?(result.source_type) %>
+                  <%= link_to result.source_title,
+                        edit_workspace_knowledge_source_path(@workspace, result.source_id),
+                        class: "hover:text-primary" %>
+                <% else %>
+                  <%= result.source_title %>
+                <% end %>
               </span>
-              <% if chunk.page_number %>
-                <span>Page <%= chunk.page_number %></span>
-              <% end %>
-              <% source = chunk.metadata["source_type"] %>
-              <% if source.present? && source != "text" %>
-                <span class="badge badge-xs badge-ghost uppercase"><%= source.tr("_", " ") %></span>
+              <span><%= result.source_locator %></span>
+              <span class="badge badge-xs badge-ghost uppercase"><%= result.source_type.humanize %></span>
+              <% source_detail = result.metadata["source_type"] %>
+              <% if result.source_type == "document" && source_detail.present? && source_detail != "text" %>
+                <span class="badge badge-xs badge-ghost uppercase"><%= source_detail.humanize %></span>
               <% end %>
             </div>
             <span class="tabular-nums">
-              <%= "%.0f%%" % ((1 - chunk.neighbor_distance) * 100) %> match
+              <%= "%.0f%%" % ((1 - result.neighbor_distance) * 100) %> match
             </span>
           </div>
-          <p class="text-sm text-base-content/80 leading-relaxed"><%= chunk.content %></p>
+          <p class="text-sm text-base-content/80 leading-relaxed"><%= result.content %></p>
         </div>
       <% end %>
 
       <% if @results.empty? %>
         <div class="rounded-lg border border-base-300 bg-base-100 p-8 text-center">
           <p class="text-base-content/60 text-sm">
-            No embedded documents matched your query. Make sure documents have finished processing.
+            No indexed workspace knowledge matched your query. Make sure documents and notes have finished processing.
           </p>
         </div>
       <% end %>

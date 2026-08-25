@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_25_000001) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_25_000002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -96,7 +96,47 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_25_000001) do
     t.bigint "user_id", null: false
     t.index ["status", "created_at"], name: "index_documents_on_status_and_created_at"
     t.index ["user_id"], name: "index_documents_on_user_id"
-    t.check_constraint "enrichment_status::text = ANY (ARRAY['not_required'::character varying, 'pending'::character varying, 'in_progress'::character varying, 'succeeded'::character varying, 'skipped'::character varying, 'partial'::character varying, 'failed'::character varying]::text[])", name: "documents_enrichment_status_check"
+    t.check_constraint "enrichment_status::text = ANY (ARRAY['not_required'::character varying::text, 'pending'::character varying::text, 'in_progress'::character varying::text, 'succeeded'::character varying::text, 'skipped'::character varying::text, 'partial'::character varying::text, 'failed'::character varying::text])", name: "documents_enrichment_status_check"
+  end
+
+  create_table "knowledge_chunks", force: :cascade do |t|
+    t.integer "chunk_index", null: false
+    t.text "content", null: false
+    t.string "content_checksum", null: false
+    t.datetime "created_at", null: false
+    t.vector "embedding", limit: 1536
+    t.string "embedding_model"
+    t.bigint "knowledge_source_id", null: false
+    t.jsonb "metadata", default: {}, null: false
+    t.integer "token_count"
+    t.datetime "updated_at", null: false
+    t.index ["knowledge_source_id", "chunk_index"], name: "index_knowledge_chunks_on_source_and_chunk", unique: true
+    t.index ["knowledge_source_id", "embedding_model"], name: "index_knowledge_chunks_on_source_and_model"
+    t.index ["knowledge_source_id"], name: "index_knowledge_chunks_on_knowledge_source_id"
+  end
+
+  create_table "knowledge_sources", force: :cascade do |t|
+    t.text "content", null: false
+    t.datetime "created_at", null: false
+    t.string "error_code"
+    t.datetime "indexed_at"
+    t.integer "indexing_generation", default: 0, null: false
+    t.integer "indexing_job_execution", default: 0, null: false
+    t.string "indexing_job_id"
+    t.string "source_type", null: false
+    t.string "status", default: "pending", null: false
+    t.string "title", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.bigint "workspace_id", null: false
+    t.index ["status", "created_at"], name: "index_knowledge_sources_on_status_and_created_at"
+    t.index ["user_id", "created_at"], name: "index_knowledge_sources_on_user_id_and_created_at"
+    t.index ["user_id"], name: "index_knowledge_sources_on_user_id"
+    t.index ["workspace_id", "created_at"], name: "index_knowledge_sources_on_workspace_id_and_created_at"
+    t.index ["workspace_id", "source_type"], name: "index_knowledge_sources_on_workspace_id_and_source_type"
+    t.index ["workspace_id"], name: "index_knowledge_sources_on_workspace_id"
+    t.check_constraint "source_type::text = ANY (ARRAY['note'::character varying, 'memo'::character varying]::text[])", name: "knowledge_sources_type_check"
+    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'indexing'::character varying, 'ready'::character varying, 'unindexed'::character varying, 'failed'::character varying]::text[])", name: "knowledge_sources_status_check"
   end
 
   create_table "sessions", force: :cascade do |t|
@@ -135,7 +175,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_25_000001) do
     t.index ["user_id"], name: "index_workspace_questions_on_user_id"
     t.index ["workspace_id", "created_at"], name: "index_workspace_questions_on_workspace_id_and_created_at"
     t.index ["workspace_id"], name: "index_workspace_questions_on_workspace_id"
-    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'answering'::character varying, 'answered'::character varying, 'insufficient_context'::character varying, 'failed'::character varying]::text[])", name: "workspace_questions_status_check"
+    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying::text, 'answering'::character varying::text, 'answered'::character varying::text, 'insufficient_context'::character varying::text, 'failed'::character varying::text])", name: "workspace_questions_status_check"
   end
 
   create_table "workspaces", force: :cascade do |t|
@@ -153,6 +193,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_25_000001) do
   add_foreign_key "document_workspaces", "documents"
   add_foreign_key "document_workspaces", "workspaces"
   add_foreign_key "documents", "users"
+  add_foreign_key "knowledge_chunks", "knowledge_sources"
+  add_foreign_key "knowledge_sources", "users"
+  add_foreign_key "knowledge_sources", "workspaces"
   add_foreign_key "sessions", "users"
   add_foreign_key "workspace_questions", "users"
   add_foreign_key "workspace_questions", "workspaces"

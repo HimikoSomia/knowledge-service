@@ -11,6 +11,7 @@ This document is the durable index for the application-update phases. It records
 | 05 | Complete | Standardize production PostgreSQL configuration on discrete host, port, username, and password variables. See [ADR 0002](decisions/0002-production-database-environment.md). |
 | 06 | Complete | Enforce workspace validation and same-owner document/workspace joins, with controller and isolation coverage. See [ADR 0003](decisions/0003-workspace-ownership-integrity.md). |
 | 07 | Complete | Add asynchronous grounded workspace Q&A with citation snapshots, neutral retrieval results, authenticated HTML/JSON resources, and duplicate-delivery protection. See [ADR 0004](decisions/0004-grounded-workspace-qa.md). |
+| 08 | Complete | Add user-authored notes and memos with safe background indexing and multi-source workspace retrieval. See [ADR 0005](decisions/0005-manual-workspace-knowledge.md). |
 
 ## Phase 04 acceptance summary
 

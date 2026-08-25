@@ -14,15 +14,14 @@ class WorkspacesController < ApplicationController
     @query = params[:q].to_s.strip
 
     if @query.present?
-      service = Retrieval::DocumentSearchService.new(Current.user)
+      service = Retrieval::WorkspaceKnowledgeSearchService.new(Current.user)
       begin
         @results = service.search(@query, limit: 10, workspace_id: @workspace.id)
-                          .includes(:document)
         @search_performed = true
-      rescue Retrieval::DocumentSearchService::NotConfiguredError
-        @search_error = "Search is not available yet. Document embedding must be configured first."
+      rescue Retrieval::WorkspaceKnowledgeSearchService::NotConfiguredError
+        @search_error = "Search is not available yet. Knowledge embedding must be configured first."
       rescue => e
-        Rails.logger.error "WorkspacesController#search: #{e.message}"
+        Rails.logger.error "WorkspacesController#search failed (#{e.class})"
         @search_error = "Search failed. Please try again."
       end
     end
@@ -72,5 +71,6 @@ class WorkspacesController < ApplicationController
   def prepare_question_ui
     @workspace_question = @workspace.workspace_questions.new(user: Current.user)
     @recent_questions = @workspace.workspace_questions.where(user: Current.user).recent_first.limit(5)
+    @knowledge_sources = @workspace.knowledge_sources.where(user: Current.user).recent_first
   end
 end

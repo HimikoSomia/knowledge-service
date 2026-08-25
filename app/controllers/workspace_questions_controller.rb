@@ -69,6 +69,7 @@ class WorkspaceQuestionsController < ApplicationController
 
   def prepare_workspace_show
     @recent_questions = owned_questions.recent_first.limit(5)
+    @knowledge_sources = @workspace.knowledge_sources.where(user: Current.user).recent_first
   end
 
   def question_payload(question)

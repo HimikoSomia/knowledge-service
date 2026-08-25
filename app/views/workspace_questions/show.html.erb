@@ -34,6 +34,10 @@
             <span>[<%= citation["number"] %>]</span>
             <% if citation["source_type"] == "document" %>
               <%= link_to citation["title"], document_path(citation["source_id"]), class: "link link-primary" %>
+            <% elsif KnowledgeSource.source_types.key?(citation["source_type"]) %>
+              <%= link_to citation["title"],
+                    edit_workspace_knowledge_source_path(@workspace, citation["source_id"]),
+                    class: "link link-primary" %>
             <% else %>
               <span><%= citation["title"] %></span>
             <% end %>

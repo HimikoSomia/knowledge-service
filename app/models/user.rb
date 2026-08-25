@@ -4,6 +4,7 @@ class User < ApplicationRecord
   has_many :workspaces, dependent: :destroy
   has_many :documents, dependent: :destroy
   has_many :workspace_questions, dependent: :destroy
+  has_many :knowledge_sources, dependent: :destroy
 
   normalizes :email_address, with: ->(e) { e.strip.downcase }
 end

@@ -1,8 +1,7 @@
 require "digest"
 
 class Chunking::DocumentChunker
-  MAX_CHARS  = 2000
-  OVERLAP_CHARS = 100
+  MAX_CHARS = Chunking::TextSplitter::MAX_CHARS
 
   def initialize(document, extraction_result)
     @document = document
@@ -63,14 +62,14 @@ class Chunking::DocumentChunker
 
       when "paragraph"
         text = section["content"].to_s
-        split_text(text).each do |part|
+        text_splitter.split(text).each do |part|
           chunks << build_chunk(part, section, char_offset, current_heading, "paragraph")
           char_offset += part.length
         end
 
       when "table"
         text = table_to_text(section)
-        split_text(text).each do |part|
+        text_splitter.split(text).each do |part|
           meta = { "type" => "table", "heading" => current_heading,
                    "headers" => section["headers"] }.compact
           chunks << {
@@ -118,54 +117,6 @@ class Chunking::DocumentChunker
     }
   end
 
-  # Splits text into sentence-aware segments no longer than MAX_CHARS.
-  # Falls back to word-boundary splitting when sentences are too long.
-  def split_text(text)
-    return [ text ] if text.length <= MAX_CHARS
-
-    parts     = []
-    sentences = text.scan(/[^.!?\n]+(?:[.!?\n]+|$)/).map(&:strip).reject(&:empty?)
-    current   = ""
-
-    sentences.each do |sentence|
-      if sentence.length > MAX_CHARS
-        # Sentence itself is oversized — flush current and split by words
-        parts << current.strip unless current.blank?
-        current = ""
-        parts.concat(split_by_words(sentence))
-        next
-      end
-
-      if current.length + sentence.length + 1 > MAX_CHARS
-        parts  << current.strip unless current.blank?
-        current = sentence
-      else
-        current = current.empty? ? sentence : "#{current} #{sentence}"
-      end
-    end
-
-    parts << current.strip unless current.blank?
-    parts.empty? ? [ text[0, MAX_CHARS] ] : parts
-  end
-
-  # Word-boundary splitting for text without sentence markers.
-  def split_by_words(text)
-    parts   = []
-    current = ""
-
-    text.split.each do |word|
-      if current.length + word.length + 1 > MAX_CHARS
-        parts  << current.strip unless current.blank?
-        current = word
-      else
-        current = current.empty? ? word : "#{current} #{word}"
-      end
-    end
-
-    parts << current.strip unless current.blank?
-    parts.empty? ? [ text[0, MAX_CHARS] ] : parts
-  end
-
   def table_to_text(section)
     headers = section["headers"].to_a
     rows    = section["rows"].to_a
@@ -188,5 +139,9 @@ class Chunking::DocumentChunker
   # Replace with tiktoken if accurate counts are needed.
   def estimate_tokens(text)
     (text.to_s.bytesize / 4.0).ceil
+  end
+
+  def text_splitter
+    @text_splitter ||= Chunking::TextSplitter.new(max_chars: MAX_CHARS)
   end
 end
