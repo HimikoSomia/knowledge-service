@@ -96,6 +96,23 @@ Performance may move higher only for a demonstrated bottleneck, clearly unsuitab
 - Views render prepared state. Helpers format or present data and must not mutate records or call external services.
 - Use Stimulus for small explicit browser behaviors and prefer Turbo/server-rendered HTML over custom client-side state.
 - Use narrow abstractions only when they create a real boundary or test seam. Add new directories only when Rails' existing structure cannot express the problem cleanly.
+- Prefer plain Ruby objects (POROs) when domain logic does not require Active Record persistence, HTTP state, or framework lifecycle behavior.
+- A PORO does not require a dedicated `app/poros/` directory. Place it in the smallest existing domain or module location that makes its responsibility obvious.
+- Extract a PORO when it gives a business concept a clear name, isolates calculation or decision logic, or creates a useful test seam. Do not extract one only to reduce another class's line count.
+
+### Pragmatic Design And Boring Code
+
+Use SOLID principles as design guidance, not as a requirement to introduce patterns or layers.
+
+- Give classes and methods one cohesive responsibility, but do not split them to satisfy an arbitrary size limit.
+- Prefer Rails built-ins and ordinary Ruby before adding abstractions, gems, framework layers, or custom infrastructure.
+- Prefer explicit code and small duck-typed interfaces over clever metaprogramming, deep inheritance, formal interface layers, reflection-driven dispatch, callback chains, or DSLs.
+- Prefer composition when behavior genuinely varies. Add extension points only when a real second implementation or demonstrated source of change exists.
+- Inject external dependencies when it creates a useful test seam. Do not add dependency-injection frameworks or wrapper layers without a concrete need.
+- Do not create interfaces, factories, strategies, repositories, base classes, adapters, or other specialized objects speculatively. Use a named pattern only when the current problem requires it.
+- Small duplication is preferable to the wrong abstraction. Refactor after a stable pattern becomes clear rather than predicting future reuse.
+- Keep necessary complexity close to the problem that requires it, and optimize only for measured bottlenecks or clearly unsuitable queries and algorithms.
+- Do not change working code merely to fit a preferred pattern. Preserve reasonable repository conventions when multiple styles would be valid.
 
 ### Authentication And Ownership
 
@@ -172,8 +189,24 @@ Performance may move higher only for a demonstrated bottleneck, clearly unsuitab
 
 Every behavior change needs focused tests at the lowest useful layer.
 
-- Keep the Rails test suite single-process by default. Do not enable process-based parallel tests that create numbered `knowledge_service_test_*` databases unless the user explicitly requests parallel execution and approves the database lifecycle. Remove approved temporary worker databases when that run is complete.
+### Test Database Permission
 
+Agents are authorized to use the repository's isolated local test database for verification without asking for additional approval. When the environment is explicitly `RAILS_ENV=test`, agents may run as needed:
+
+```bash
+RAILS_ENV=test bin/rails db:prepare
+RAILS_ENV=test bin/rails db:migrate
+RAILS_ENV=test bin/rails test
+RAILS_ENV=test bin/rails runner ...
+```
+
+Before database lifecycle commands, verify that the environment is `test` and the configuration clearly resolves to this repository's isolated local test database. Do not proceed if it resolves to production, staging, a shared database, or an unknown external `DATABASE_URL`. Do not print a secret-bearing database URL while checking.
+
+Ordinary test-data creation, mutation, transaction rollback, fixture loading, and cleanup performed by the test suite do not require approval. Runtime sandbox or host security confirmations still apply and cannot be overridden by this file.
+
+Explicit approval remains required for production or staging operations, unknown or shared external databases, development database destruction, destructive commands outside an established isolated test database, operations that could affect user-created data, and parallel tests that create additional databases.
+
+- Keep the Rails test suite single-process by default. Do not enable process-based parallel tests that create numbered `knowledge_service_test_*` databases unless the user explicitly requests parallel execution and approves the database lifecycle. Remove approved temporary worker databases when that run is complete.
 - Model changes: validations, associations, lifecycle methods, and edge cases.
 - Controller changes: success, validation failure, authentication, authorization, response status, and redirect/render behavior.
 - Ownership changes: two-user isolation and submitted foreign-ID coverage.
