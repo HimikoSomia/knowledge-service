@@ -12,6 +12,7 @@ This document is the durable index for the application-update phases. It records
 | 06 | Complete | Enforce workspace validation and same-owner document/workspace joins, with controller and isolation coverage. See [ADR 0003](decisions/0003-workspace-ownership-integrity.md). |
 | 07 | Complete | Add asynchronous grounded workspace Q&A with citation snapshots, neutral retrieval results, authenticated HTML/JSON resources, and duplicate-delivery protection. See [ADR 0004](decisions/0004-grounded-workspace-qa.md). |
 | 08 | Complete | Add user-authored notes and memos with safe background indexing and multi-source workspace retrieval. See [ADR 0005](decisions/0005-manual-workspace-knowledge.md). |
+| 09 | Planned | Establish a repeatable retrieval-quality, ownership-isolation, and exact-search scale baseline before external integrations. See [Phase 09 plan](phase-09-retrieval-evaluation-baseline.md). |
 
 ## Long-term productization target
 
