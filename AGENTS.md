@@ -217,6 +217,7 @@ Explicit approval remains required for production or staging operations, unknown
 - Retrieval changes: user/workspace isolation, embedding-model compatibility, and missing-configuration behavior.
 - Migration/query changes: PostgreSQL verification against an explicitly selected isolated database when available.
 - View/asset changes: relevant rendering tests plus a Tailwind rebuild when class discovery/output changes.
+- Browser workflow changes: focused Rails system tests with deterministic provider fakes; no live external calls.
 
 Run focused tests while iterating, then the full suite when available:
 
@@ -261,6 +262,7 @@ RAILS_ENV=test bin/rails db:migrate
 
 # Run the full test suite and project CI.
 bin/rails test
+bin/rails test:system
 bin/ci
 ```
 

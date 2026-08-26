@@ -148,6 +148,14 @@ Run the Rails test suite:
 bin/rails test
 ```
 
+Run browser acceptance tests with headless Chrome:
+
+```sh
+bin/rails test:system
+```
+
+Set `SHOW_BROWSER=1` to watch the system tests in a local Chrome window. Local runs use Selenium Manager to resolve a ChromeDriver compatible with the installed browser; set `SE_SKIP_DRIVER_IN_PATH=false` to intentionally use a driver from `PATH`. System tests use deterministic provider fakes and the single configured test database; they do not require OpenAI credentials or make live provider calls. Failed system tests save screenshots under `tmp/screenshots`.
+
 Useful focused checks:
 
 ```sh
