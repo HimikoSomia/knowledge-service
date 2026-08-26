@@ -110,6 +110,10 @@ class Document < ApplicationRecord
     )
   end
 
+  def retry_processing!
+    enqueue_processing_for_current_file(required_status: "failed", raise_on_failure: false)
+  end
+
   private
 
   def detect_document_type
@@ -152,13 +156,16 @@ class Document < ApplicationRecord
     enqueue_processing_for_current_file
   end
 
-  def enqueue_processing_for_current_file
+  def enqueue_processing_for_current_file(required_status: nil, raise_on_failure: true)
+    return false unless file.attached?
+
     checksum = file.blob.checksum
     generation = nil
     job = nil
 
     with_lock do
-      return if processing_checksum == checksum && !failed?
+      return false if required_status && status != required_status
+      return false if processing_checksum == checksum && !failed?
 
       generation = processing_generation + 1
       job = ProcessDocumentJob.new(id, generation)
@@ -177,7 +184,10 @@ class Document < ApplicationRecord
       )
     end
 
-    job.enqueue
+    enqueued_job = job.enqueue
+    raise ActiveJob::EnqueueError, "Document processing was not enqueued" unless enqueued_job
+
+    true
   rescue => e
     if job
       fail_current_processing!(
@@ -187,7 +197,9 @@ class Document < ApplicationRecord
       )
     end
     Rails.logger.error "Document #{id} processing enqueue failed (#{e.class})"
-    raise
+    raise if raise_on_failure
+
+    false
   end
 
   def current_processing_generation?(generation)

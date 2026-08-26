@@ -19,6 +19,8 @@ module DocumentProcessingLogging
 
   def friendly_message_for(exception)
     case exception
+    when Embedding::OpenAiEmbeddingService::QuotaError
+      "Embedding quota is unavailable. Check OpenAI billing and usage limits, then retry."
     when Embedding::OpenAiEmbeddingService::RateLimitError
       "Embedding service is temporarily rate-limited. Processing will retry automatically."
     when Embedding::OpenAiEmbeddingService::ServiceError

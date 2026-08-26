@@ -58,6 +58,8 @@
       <div>
         <p class="font-semibold">Document processing failed</p>
         <p class="text-sm"><%= @document.error_message %></p>
+        <%= button_to "Retry processing", document_retry_path(@document),
+              class: "btn btn-sm mt-3" %>
       </div>
     </div>
   <% end %>

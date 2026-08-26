@@ -65,6 +65,22 @@ class EmbedDocumentJobTest < ActiveJob::TestCase
     assert_equal "failed", @document.reload.status
   end
 
+  test "discards exhausted quota without scheduling retries" do
+    create_chunks(@document, 1)
+    service = embedding_service(
+      error: Embedding::OpenAiEmbeddingService::QuotaError.new("quota unavailable")
+    )
+
+    assert_no_enqueued_jobs do
+      assert_nothing_raised { perform_job(service) }
+    end
+
+    @document.reload
+    assert_equal "failed", @document.status
+    assert_equal "Embedding quota is unavailable. Check OpenAI billing and usage limits, then retry.",
+                 @document.error_message
+  end
+
   test "discards invalid input errors without retrying" do
     create_chunks(@document, 1)
     service = embedding_service(error: Embedding::OpenAiEmbeddingService::InvalidInputError.new("blank input"))

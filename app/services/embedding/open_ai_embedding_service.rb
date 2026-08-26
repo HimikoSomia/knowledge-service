@@ -1,4 +1,5 @@
 require "openai"
+require "json"
 
 # Generates embeddings through OpenAI.
 #
@@ -16,6 +17,7 @@ require "openai"
 #
 class Embedding::OpenAiEmbeddingService
   ConfigurationError = Class.new(StandardError)
+  QuotaError = Class.new(ConfigurationError)
   RateLimitError = Class.new(StandardError)
   ServiceError = Class.new(StandardError)
   ValidationError = Class.new(StandardError)
@@ -113,34 +115,66 @@ class Embedding::OpenAiEmbeddingService
     end
 
     vectors
-  rescue Faraday::TimeoutError, Faraday::ConnectionFailed => e
-    raise ServiceError,
-      "Network error calling OpenAI: #{e.message}"
+  rescue Faraday::Error => e
+    handle_faraday_error(e)
   rescue OpenAI::Error => e
     handle_openai_error(e)
   end
 
-  def handle_openai_error(error)
-    status  = error.response&.dig(:status)
-    message = error.message.to_s
+  def handle_faraday_error(error)
+    handle_provider_error(
+      status: error.response_status,
+      body: error.response_body
+    )
+  end
 
+  def handle_openai_error(error)
+    response = error.respond_to?(:response) ? error.response : nil
+    handle_provider_error(
+      status: response&.dig(:status) || response&.dig("status"),
+      body: response&.dig(:body) || response&.dig("body")
+    )
+  end
+
+  def handle_provider_error(status:, body:)
     case status
-    when 401
+    when 401, 403, 404
       raise ConfigurationError,
-        "OpenAI authentication failed — check OPENAI_API_KEY (HTTP 401)"
-    when 400
+        "OpenAI embedding configuration was rejected (HTTP #{status})"
+    when 400, 422
       raise InvalidInputError,
-        "OpenAI rejected the input (HTTP 400): #{message}"
+        "OpenAI rejected the embedding input (HTTP #{status})"
     when 429
+      if quota_exhausted?(body)
+        raise QuotaError,
+          "OpenAI embedding quota is unavailable (HTTP 429)"
+      end
+
       raise RateLimitError,
-        "OpenAI rate limit exceeded (HTTP 429): #{message}"
-    when 500, 502, 503, 504
+        "OpenAI embedding rate limit exceeded (HTTP 429)"
+    when 408, 409, 500, 502, 503, 504
       raise ServiceError,
-        "OpenAI service error (HTTP #{status}): #{message}"
+        "OpenAI embedding service is temporarily unavailable (HTTP #{status})"
     else
       raise ServiceError,
-        "OpenAI error (HTTP #{status || 'unknown'}): #{message}"
+        "OpenAI embedding request failed (HTTP #{status || 'unknown'})"
     end
+  end
+
+  def quota_exhausted?(body)
+    payload = body.is_a?(String) ? JSON.parse(body) : body
+    return false unless payload.is_a?(Hash)
+
+    details = payload["error"] || payload[:error] || payload
+    return false unless details.is_a?(Hash)
+
+    code = details["code"] || details[:code]
+    type = details["type"] || details[:type]
+    [ code, type ].compact.map(&:to_s).any? do |value|
+      %w[insufficient_quota billing_hard_limit_reached].include?(value)
+    end
+  rescue JSON::ParserError
+    false
   end
 
   # Normalises text before sending to OpenAI:

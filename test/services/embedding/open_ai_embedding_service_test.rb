@@ -138,6 +138,32 @@ class Embedding::OpenAiEmbeddingServiceTest < ActiveSupport::TestCase
     end
   end
 
+  test "translates the Faraday 429 raised by the installed adapter" do
+    stub_client_with_error(faraday_error(
+      Faraday::TooManyRequestsError,
+      status: 429,
+      body: { "error" => { "type" => "rate_limit_exceeded" } }
+    ))
+
+    error = assert_raises(Embedding::OpenAiEmbeddingService::RateLimitError) do
+      @service.embed_texts([ "hello" ])
+    end
+    assert_equal "OpenAI embedding rate limit exceeded (HTTP 429)", error.message
+  end
+
+  test "treats insufficient quota as a permanent account configuration failure" do
+    stub_client_with_error(faraday_error(
+      Faraday::TooManyRequestsError,
+      status: 429,
+      body: JSON.generate(error: { code: "insufficient_quota", message: "sensitive provider detail" })
+    ))
+
+    error = assert_raises(Embedding::OpenAiEmbeddingService::QuotaError) do
+      @service.embed_texts([ "hello" ])
+    end
+    assert_not_includes error.message, "sensitive provider detail"
+  end
+
   test "raises ConfigurationError on HTTP 401" do
     stub_client_with_openai_error(status: 401, message: "unauthorized")
     assert_raises(Embedding::OpenAiEmbeddingService::ConfigurationError) do
@@ -216,6 +242,21 @@ class Embedding::OpenAiEmbeddingServiceTest < ActiveSupport::TestCase
     fake = Object.new
     fake.define_singleton_method(:embeddings) { |**_| raise error_class.new("timeout") }
     OpenAI::Client.define_singleton_method(:new) { |**_| fake }
+  end
+
+  def stub_client_with_error(error)
+    fake = Object.new
+    fake.define_singleton_method(:embeddings) { |**_| raise error }
+    OpenAI::Client.define_singleton_method(:new) { |**_| fake }
+  end
+
+  def faraday_error(error_class, status:, body:)
+    error_class.new(
+      status: status,
+      body: body,
+      headers: {},
+      request: { method: :post, url: URI("https://api.openai.com/v1/embeddings") }
+    )
   end
 
   def build_response_static(vectors)

@@ -135,8 +135,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_25_000002) do
     t.index ["workspace_id", "created_at"], name: "index_knowledge_sources_on_workspace_id_and_created_at"
     t.index ["workspace_id", "source_type"], name: "index_knowledge_sources_on_workspace_id_and_source_type"
     t.index ["workspace_id"], name: "index_knowledge_sources_on_workspace_id"
-    t.check_constraint "source_type::text = ANY (ARRAY['note'::character varying, 'memo'::character varying]::text[])", name: "knowledge_sources_type_check"
-    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'indexing'::character varying, 'ready'::character varying, 'unindexed'::character varying, 'failed'::character varying]::text[])", name: "knowledge_sources_status_check"
+    t.check_constraint "source_type::text = ANY (ARRAY['note'::character varying::text, 'memo'::character varying::text])", name: "knowledge_sources_type_check"
+    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying::text, 'indexing'::character varying::text, 'ready'::character varying::text, 'unindexed'::character varying::text, 'failed'::character varying::text])", name: "knowledge_sources_status_check"
   end
 
   create_table "sessions", force: :cascade do |t|

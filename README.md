@@ -110,6 +110,12 @@ Without `OPENAI_API_KEY`, document extraction and chunking still run, but the do
 
 The stages run sequentially, and the document has one main lifecycle status from `pending` through `ready`. Image-enrichment status is displayed separately so skipped or partial enrichment is not presented as full success. `enriched_at` is recorded only when that stage reaches a terminal outcome; it is not set while the work is merely queued, running, or waiting to retry.
 
+Temporary embedding rate limits and provider failures use Active Job backoff. An OpenAI `insufficient_quota` response is treated as an account-configuration failure rather than repeatedly retried. Failed documents retain their extracted content and display a **Retry processing** action; retrying creates one new processing generation and reruns the pipeline after the provider or configuration issue is resolved. The same owner-scoped action is available to JSON clients:
+
+```text
+POST /documents/:document_id/retry
+```
+
 ## Grounded workspace Q&A
 
 The workspace page provides two related operations:

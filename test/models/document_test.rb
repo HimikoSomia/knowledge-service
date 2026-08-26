@@ -131,4 +131,31 @@ class DocumentTest < ActiveSupport::TestCase
     assert doc.enrichment_not_required?
     assert_nil doc.enriched_at
   end
+
+  test "retry processing queues one new generation for a failed document" do
+    doc = documents(:pending_doc)
+    doc.file.attach(io: File.open(file_fixture("sample.txt")), filename: "sample.txt", content_type: "text/plain")
+    clear_enqueued_jobs
+    doc.update_columns(status: "failed", error_message: "Safe failure")
+    previous_generation = doc.processing_generation
+
+    assert_enqueued_jobs 1, only: ProcessDocumentJob do
+      assert doc.retry_processing!
+    end
+
+    doc.reload
+    assert_equal "pending", doc.status
+    assert_equal previous_generation + 1, doc.processing_generation
+    assert_nil doc.error_message
+  end
+
+  test "retry processing rejects a document that is not failed" do
+    doc = documents(:pending_doc)
+    doc.file.attach(io: File.open(file_fixture("sample.txt")), filename: "sample.txt", content_type: "text/plain")
+    clear_enqueued_jobs
+
+    assert_no_enqueued_jobs do
+      assert_not doc.retry_processing!
+    end
+  end
 end

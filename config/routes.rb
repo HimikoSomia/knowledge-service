@@ -22,5 +22,7 @@ Rails.application.routes.draw do
       get :search
     end
   end
-  resources :documents
+  resources :documents do
+    resource :retry, controller: "document_retries", only: :create
+  end
 end
