@@ -156,6 +156,8 @@ bin/rails test:system
 
 Set `SHOW_BROWSER=1` to watch the system tests in a local Chrome window. Local runs use Selenium Manager to resolve a ChromeDriver compatible with the installed browser; set `SE_SKIP_DRIVER_IN_PATH=false` to intentionally use a driver from `PATH`. System tests use deterministic provider fakes and the single configured test database; they do not require OpenAI credentials or make live provider calls. Failed system tests save screenshots under `tmp/screenshots`.
 
+GitHub Actions starts a disposable pgvector-enabled PostgreSQL service for each Rails test job and connects through the test-only `DB_HOST`, `DB_PORT`, `DB_USERNAME`, and `DB_PASSWORD` values in the workflow. Rails creates and prepares `knowledge_service_test` inside that service; no persistent GitHub database or repository secret is required.
+
 Useful focused checks:
 
 ```sh

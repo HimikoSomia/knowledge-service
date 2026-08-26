@@ -1,4 +1,5 @@
 # PostgreSQL. Versions 9.5 and up are supported.
+<% production_runtime = ENV["RAILS_ENV"] == "production" || ENV["RACK_ENV"] == "production" %>
 #
 # Install the pg driver:
 #   gem install pg
@@ -73,6 +74,8 @@ development:
 test:
   <<: *default
   database: knowledge_service_test
+  host: <%= ENV.fetch("DB_HOST") { "localhost" } %>
+  port: <%= ENV.fetch("DB_PORT", 5432) %>
   username: <%= ENV.fetch("DB_USERNAME") { "" } %>
   password: <%= ENV.fetch("DB_PASSWORD") { "" } %>
 
@@ -89,10 +92,10 @@ production:
   primary: &primary_production
     <<: *default
     database: knowledge_service_production
-    host: <%= ENV.fetch("DB_HOST") %>
+    host: <%= ENV.fetch("DB_HOST") if production_runtime %>
     port: <%= ENV.fetch("DB_PORT", 5432) %>
-    username: <%= ENV.fetch("DB_USERNAME") %>
-    password: <%= ENV.fetch("DB_PASSWORD") %>
+    username: <%= ENV.fetch("DB_USERNAME") if production_runtime %>
+    password: <%= ENV.fetch("DB_PASSWORD") if production_runtime %>
   cache:
     <<: *primary_production
     database: knowledge_service_production_cache

@@ -12,6 +12,7 @@ class ProductionDatabaseConfigTest < ActiveSupport::TestCase
 
   test "all production roles use the configured host port and credentials" do
     with_database_environment(
+      "RAILS_ENV" => "production",
       "DB_HOST" => "database.internal",
       "DB_PORT" => "6543",
       "DB_USERNAME" => "production_user",
@@ -32,6 +33,7 @@ class ProductionDatabaseConfigTest < ActiveSupport::TestCase
 
   test "production port defaults to 5432" do
     with_database_environment(
+      "RAILS_ENV" => "production",
       "DB_HOST" => "database.internal",
       "DB_PORT" => nil,
       "DB_USERNAME" => "production_user",
@@ -45,11 +47,28 @@ class ProductionDatabaseConfigTest < ActiveSupport::TestCase
 
   test "production host is required while rendering configuration" do
     with_database_environment(
+      "RAILS_ENV" => "production",
       "DB_HOST" => nil,
       "DB_USERNAME" => "production_user",
       "DB_PASSWORD" => "production_password"
     ) do
       assert_raises(KeyError) { rendered_database_config }
+    end
+  end
+
+  test "test configuration renders without production database variables" do
+    with_database_environment(
+      "RAILS_ENV" => "test",
+      "RACK_ENV" => nil,
+      "DB_HOST" => nil,
+      "DB_USERNAME" => nil,
+      "DB_PASSWORD" => nil
+    ) do
+      test_config = rendered_database_config.fetch("test")
+
+      assert_equal "knowledge_service_test", test_config.fetch("database")
+      assert_equal "localhost", test_config.fetch("host")
+      assert_equal 5432, test_config.fetch("port")
     end
   end
 
