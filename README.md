@@ -2,6 +2,8 @@
 
 Knowledge Service is a Rails application for organizing user-owned workspaces, uploaded documents, notes, and memos. It turns workspace content into searchable chunks, optionally enriches document images with OpenAI Vision, generates OpenAI embeddings, and provides workspace-scoped semantic search and grounded answers.
 
+The current deliverable is a standalone application. Its directional productization target is a configurable Rails Engine gem, with this repository retained as the reference host; that extraction is not yet implemented or scheduled. See [Long-Term Productization Target](docs/productization-target.md).
+
 ## Features
 
 - Session-based authentication with password-reset support.

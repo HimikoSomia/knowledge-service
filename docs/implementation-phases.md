@@ -13,6 +13,10 @@ This document is the durable index for the application-update phases. It records
 | 07 | Complete | Add asynchronous grounded workspace Q&A with citation snapshots, neutral retrieval results, authenticated HTML/JSON resources, and duplicate-delivery protection. See [ADR 0004](decisions/0004-grounded-workspace-qa.md). |
 | 08 | Complete | Add user-authored notes and memos with safe background indexing and multi-source workspace retrieval. See [ADR 0005](decisions/0005-manual-workspace-knowledge.md). |
 
+## Long-term productization target
+
+The intended final product is an embeddable, configurable Rails Engine gem with this repository retained as its standalone reference application. Gem extraction is directional and is not yet assigned to an implementation phase; retrieval evaluation and at least one real external source should establish the required extension boundaries first. See [Long-Term Productization Target](productization-target.md).
+
 ## Phase 04 acceptance summary
 
 - Missing OpenAI configuration records a skipped enrichment outcome and continues processing.
