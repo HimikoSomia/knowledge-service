@@ -11,7 +11,7 @@ class WorkspaceQuestionRetriesController < ApplicationController
     queued = @workspace_question.retry_answer!
     respond_to do |format|
       format.html do
-        redirect_to workspace_question_path(@workspace, @workspace_question),
+        redirect_to workspace_questions_path(@workspace, anchor: "workspace_question_#{@workspace_question.id}"),
                     status: :see_other,
                     notice: ("Answer generation was queued again." if queued),
                     alert: ("The answer could not be queued. Please try again." unless queued)
@@ -39,7 +39,7 @@ class WorkspaceQuestionRetriesController < ApplicationController
   def respond_not_retryable
     respond_to do |format|
       format.html do
-        redirect_to workspace_question_path(@workspace, @workspace_question),
+        redirect_to workspace_questions_path(@workspace, anchor: "workspace_question_#{@workspace_question.id}"),
                     status: :see_other,
                     alert: "Only failed questions can be retried."
       end

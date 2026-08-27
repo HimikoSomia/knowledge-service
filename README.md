@@ -118,10 +118,9 @@ POST /documents/:document_id/retry
 
 ## Grounded workspace Q&A
 
-The workspace page provides two related operations:
+Grounded Q&A has a dedicated workspace chat page, separate from the workspace overview's documents, notes, memos, and direct semantic-search tools. **Open chat** starts or resumes the workspace conversation. Sending a message creates a persisted question, retrieves relevant document, note, and memo chunks, and asynchronously generates an answer that must cite its sources. The conversation refreshes while an answer is running and displays the answer, supporting citations, insufficient-context outcome, or safe failure state inline.
 
-- **Generate answer** creates a persisted question, retrieves relevant document, note, and memo chunks, and asynchronously generates an answer that must cite its sources.
-- **Search matching passages** exposes the same kinds of workspace evidence directly without generating an answer.
+**Search matching passages** remains on the workspace overview for users who want to inspect retrieved evidence directly without generating an answer.
 
 Question states progress from `pending` to `answering`, then to `answered`, `insufficient_context`, or `failed`. Retrieval is limited by user and workspace ownership in SQL, vector relevance, total context size, and per-source diversity. Retrieved content is treated as untrusted evidence: instructions found inside a document are not instructions for the answer provider.
 

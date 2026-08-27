@@ -17,9 +17,32 @@ class WorkspaceQuestionsControllerTest < ActionDispatch::IntegrationTest
     end
 
     question = @workspace.workspace_questions.recent_first.first
-    assert_redirected_to workspace_question_path(@workspace, question)
+    assert_redirected_to workspace_questions_path(@workspace, anchor: "workspace_question_#{question.id}")
     assert_equal @user, question.user
     assert question.pending?
+  end
+
+  test "renders the dedicated workspace chat with its composer" do
+    answered = answered_question
+
+    get workspace_questions_path(@workspace)
+
+    assert_response :success
+    assert_select "h1", "Chat with #{@workspace.name}"
+    assert_select "#workspace-conversation"
+    assert_select "#workspace_question_#{answered.id}", text: /Grounded answer/
+    assert_select "form[action='#{workspace_questions_path(@workspace)}']"
+    assert_select "textarea[name='workspace_question[question]']"
+  end
+
+  test "chat refreshes while an answer is in progress" do
+    @workspace.workspace_questions.create!(user: @user, question: "Still working")
+
+    get workspace_questions_path(@workspace)
+
+    assert_response :success
+    assert_select "meta[http-equiv='refresh'][content='2']"
+    assert_match "Searching workspace knowledge", response.body
   end
 
   test "creates a question through JSON and returns accepted" do

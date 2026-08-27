@@ -18,7 +18,7 @@ class WorkspaceQuestionRetriesControllerTest < ActionDispatch::IntegrationTest
       post workspace_question_retry_path(@workspace, @question)
     end
 
-    assert_redirected_to workspace_question_path(@workspace, @question)
+    assert_redirected_to workspace_questions_path(@workspace, anchor: "workspace_question_#{@question.id}")
     assert @question.reload.pending?
     assert_nil @question.error_code
   end

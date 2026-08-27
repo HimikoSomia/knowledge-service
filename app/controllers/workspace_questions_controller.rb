@@ -5,7 +5,8 @@ class WorkspaceQuestionsController < ApplicationController
              with: -> { render_rate_limited }
 
   def index
-    @workspace_questions = owned_questions.recent_first.limit(50)
+    prepare_question_index
+    @workspace_question = owned_questions.new(user: Current.user)
 
     respond_to do |format|
       format.html
@@ -28,7 +29,7 @@ class WorkspaceQuestionsController < ApplicationController
       queued = @workspace_question.enqueue_answer!
       respond_to do |format|
         format.html do
-          redirect_to workspace_question_path(@workspace, @workspace_question),
+          redirect_to workspace_questions_path(@workspace, anchor: "workspace_question_#{@workspace_question.id}"),
                       status: :see_other,
                       alert: ("The answer could not be queued. Please try again." unless queued)
         end
@@ -41,8 +42,8 @@ class WorkspaceQuestionsController < ApplicationController
     else
       respond_to do |format|
         format.html do
-          prepare_workspace_show
-          render "workspaces/show", status: :unprocessable_entity
+          prepare_question_index
+          render :index, status: :unprocessable_entity
         end
         format.json { render json: { errors: @workspace_question.errors.to_hash }, status: :unprocessable_entity }
       end
@@ -67,9 +68,8 @@ class WorkspaceQuestionsController < ApplicationController
     params.expect(workspace_question: [ :question ])
   end
 
-  def prepare_workspace_show
-    @recent_questions = owned_questions.recent_first.limit(5)
-    @knowledge_sources = @workspace.knowledge_sources.where(user: Current.user).recent_first
+  def prepare_question_index
+    @workspace_questions = owned_questions.recent_first.limit(50)
   end
 
   def question_payload(question)
@@ -89,7 +89,10 @@ class WorkspaceQuestionsController < ApplicationController
 
   def render_rate_limited
     respond_to do |format|
-      format.html { redirect_to @workspace || root_path, alert: "Too many questions. Please try again shortly." }
+      format.html do
+        redirect_to @workspace ? workspace_questions_path(@workspace) : root_path,
+                    alert: "Too many questions. Please try again shortly."
+      end
       format.json { render json: { error: "rate_limited" }, status: :too_many_requests }
     end
   end

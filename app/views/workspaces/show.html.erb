@@ -10,62 +10,10 @@
       <% end %>
     </div>
     <div class="flex items-center gap-2 self-start">
+      <%= link_to "Open chat", workspace_questions_path(@workspace), class: "btn btn-primary btn-sm" %>
       <%= link_to "Edit", edit_workspace_path(@workspace), class: "btn btn-ghost btn-sm" %>
     </div>
   </div>
-
-  <%# Grounded question form %>
-  <div class="rounded-lg border border-primary/30 bg-base-100 p-5 shadow-sm">
-    <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <h2 class="text-base font-semibold text-base-content">Ask this workspace</h2>
-        <p class="text-sm text-base-content/60">Receive an answer grounded in workspace knowledge, with source citations.</p>
-      </div>
-      <% if @recent_questions.any? %>
-        <%= link_to "Question history", workspace_questions_path(@workspace), class: "btn btn-ghost btn-sm self-start" %>
-      <% end %>
-    </div>
-
-    <% if @workspace_question.errors.any? %>
-      <div id="question_error_explanation" class="alert alert-error mt-4">
-        <ul class="list-disc pl-5">
-          <% @workspace_question.errors.full_messages.each do |message| %>
-            <li><%= message %></li>
-          <% end %>
-        </ul>
-      </div>
-    <% end %>
-
-    <%= form_with model: @workspace_question,
-                  url: workspace_questions_path(@workspace),
-                  class: "mt-4 space-y-3" do |form| %>
-      <%= form.text_area :question,
-            rows: 3,
-            maxlength: WorkspaceQuestion::MAX_QUESTION_LENGTH,
-            placeholder: "e.g. What risks and next actions are described in this workspace?",
-            class: "textarea textarea-bordered w-full",
-            required: true %>
-      <div class="flex justify-end">
-        <%= form.submit "Generate answer", class: "btn btn-primary" %>
-      </div>
-    <% end %>
-  </div>
-
-  <% if @recent_questions.any? %>
-    <div class="rounded-lg border border-base-300 bg-base-100">
-      <div class="border-b border-base-300 px-4 py-3">
-        <h2 class="text-sm font-semibold">Recent questions</h2>
-      </div>
-      <div class="divide-y divide-base-300">
-        <% @recent_questions.each do |question| %>
-          <%= link_to workspace_question_path(@workspace, question), class: "flex items-center justify-between gap-4 px-4 py-3 hover:bg-base-200" do %>
-            <span class="truncate text-sm"><%= question.question %></span>
-            <span class="badge badge-ghost shrink-0"><%= question.status.humanize %></span>
-          <% end %>
-        <% end %>
-      </div>
-    </div>
-  <% end %>
 
   <%# User-authored knowledge sources %>
   <div class="rounded-lg border border-base-300 bg-base-100">

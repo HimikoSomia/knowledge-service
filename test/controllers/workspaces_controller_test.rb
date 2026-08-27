@@ -11,7 +11,8 @@ class WorkspacesControllerTest < ActionDispatch::IntegrationTest
     get workspace_path(@workspace)
     assert_response :success
     assert_select "h1", @workspace.name
-    assert_select "form[action='#{workspace_questions_path(@workspace)}']"
+    assert_select "a[href='#{workspace_questions_path(@workspace)}']", text: "Open chat"
+    assert_select "form[action='#{workspace_questions_path(@workspace)}']", count: 0
     assert_select "a[href='#{new_workspace_knowledge_source_path(@workspace)}']", text: "Add knowledge"
   end
 

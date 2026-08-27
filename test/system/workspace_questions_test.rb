@@ -10,9 +10,9 @@ class WorkspaceQuestionsTest < ApplicationSystemTestCase
   end
 
   test "generates and displays a grounded answer with its citation" do
-    visit workspace_path(@workspace)
+    visit workspace_questions_path(@workspace)
     fill_in "workspace_question_question", with: "What result is documented?"
-    click_button "Generate answer"
+    click_button "Send"
 
     assert_text "What result is documented?"
     assert_text "Searching workspace knowledge"
@@ -20,11 +20,10 @@ class WorkspaceQuestionsTest < ApplicationSystemTestCase
     perform_answer_jobs(answer: "The documented result is 42 [1].")
     refresh
 
-    assert_selector "h2", text: "Answer"
     assert_text "The documented result is 42 [1]."
-    assert_selector "#source-1", text: "Processed Document"
-    assert_selector "#source-1", text: "Page 1"
-    assert_selector "#source-1", text: "The documented result is 42."
+    assert_selector "[id^='source-1-question-']", text: "Processed Document"
+    assert_selector "[id^='source-1-question-']", text: "Page 1"
+    assert_selector "[id^='source-1-question-']", text: "The documented result is 42."
 
     question = @workspace.workspace_questions.find_by!(question: "What result is documented?")
     assert question.answered?
@@ -40,7 +39,7 @@ class WorkspaceQuestionsTest < ApplicationSystemTestCase
       error_code: "provider_unavailable"
     )
 
-    visit workspace_question_path(@workspace, question)
+    visit workspace_questions_path(@workspace)
     click_button "Retry answer"
 
     assert_text "Answer generation was queued again."
@@ -50,7 +49,7 @@ class WorkspaceQuestionsTest < ApplicationSystemTestCase
     refresh
 
     assert_text "The retry completed successfully [1]."
-    assert_selector "#source-1", text: "Processed Document"
+    assert_selector "#source-1-question-#{question.id}", text: "Processed Document"
     assert question.reload.answered?
     assert_nil question.error_code
   end
