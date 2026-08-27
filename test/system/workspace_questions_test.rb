@@ -12,7 +12,7 @@ class WorkspaceQuestionsTest < ApplicationSystemTestCase
   test "generates and displays a grounded answer with its citation" do
     visit workspace_questions_path(@workspace)
     fill_in "workspace_question_question", with: "What result is documented?"
-    click_button "Send"
+    click_button "Send question"
 
     assert_text "What result is documented?"
     assert_text "Searching workspace knowledge"

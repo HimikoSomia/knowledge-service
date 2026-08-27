@@ -107,17 +107,34 @@
 
     <%= form_with model: @workspace_question,
           url: workspace_questions_path(@workspace),
-          class: "flex items-end gap-2" do |form| %>
-      <div class="flex-1">
+          class: "block" do |form| %>
+      <div class="relative">
         <%= form.label :question, "Message", class: "sr-only" %>
         <%= form.text_area :question,
               rows: 2,
               maxlength: WorkspaceQuestion::MAX_QUESTION_LENGTH,
               placeholder: "Ask a question about this workspace…",
-              class: "textarea textarea-bordered w-full resize-none",
+              class: "textarea textarea-bordered block w-full resize-none pr-14",
               required: true %>
+        <%= form.button type: "submit",
+              class: "btn btn-primary btn-circle btn-sm absolute right-3 top-1/2 -translate-y-1/2",
+              aria: { label: "Send question" },
+              title: "Send question" do %>
+          <svg xmlns="http://www.w3.org/2000/svg"
+               viewBox="0 0 24 24"
+               fill="none"
+               stroke="currentColor"
+               stroke-width="2"
+               stroke-linecap="round"
+               stroke-linejoin="round"
+               class="h-4 w-4"
+               aria-hidden="true">
+            <path d="m22 2-7 20-4-9-9-4Z" />
+            <path d="M22 2 11 13" />
+          </svg>
+          <span class="sr-only">Send question</span>
+        <% end %>
       </div>
-      <%= form.submit "Send", class: "btn btn-primary" %>
     <% end %>
     <p class="mt-2 text-xs text-base-content/50">Answers may be incomplete. Check the cited workspace sources.</p>
   </div>
