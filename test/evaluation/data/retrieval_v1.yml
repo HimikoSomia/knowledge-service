@@ -1,0 +1,430 @@
+version: 1
+
+defaults:
+  top_k: 8
+  distance_threshold: 0.55
+  max_context_chars: 16000
+
+users:
+  - key: user_alice
+    name: Alice
+
+  - key: user_bob
+    name: Bob
+
+workspaces:
+  - key: workspace_alpha
+    user_key: user_alice
+    name: Alpha Workspace
+
+  - key: workspace_beta
+    user_key: user_alice
+    name: Beta Workspace
+
+  - key: workspace_bob
+    user_key: user_bob
+    name: Bob Workspace
+
+sources:
+  - key: doc_alpha_policy
+    type: document
+    user_key: user_alice
+    workspace_keys:
+      - workspace_alpha
+    title: Alpha Policy
+
+  - key: note_alpha_release
+    type: note
+    user_key: user_alice
+    workspace_keys:
+      - workspace_alpha
+    title: Alpha Release Notes
+
+  - key: doc_alpha_context_a
+    type: document
+    user_key: user_alice
+    workspace_keys:
+      - workspace_alpha
+    title: Alpha Context Fixture A
+
+  - key: note_alpha_context_b
+    type: note
+    user_key: user_alice
+    workspace_keys:
+      - workspace_alpha
+    title: Alpha Context Fixture B
+
+  - key: memo_beta_security
+    type: memo
+    user_key: user_alice
+    workspace_keys:
+      - workspace_beta
+    title: Beta Security Memo
+
+  - key: doc_bob_private
+    type: document
+    user_key: user_bob
+    workspace_keys:
+      - workspace_bob
+    title: Bob Private Document
+
+chunks:
+  - key: alpha_policy_refund_001
+    source_key: doc_alpha_policy
+    semantic_label: refund_policy
+    content: >
+      Customers may request a refund within thirty days of purchase.
+
+  - key: alpha_policy_cancel_001
+    source_key: doc_alpha_policy
+    semantic_label: cancellation_policy
+    content: >
+      Subscription cancellation takes effect at the end of the current billing period.
+
+  - key: alpha_refund_method_001
+    source_key: note_alpha_release
+    semantic_label: refund_policy
+    content: >
+      Approved refunds are returned through the original payment method.
+
+  - key: alpha_refund_duplicate_001
+    source_key: note_alpha_release
+    semantic_label: refund_policy
+    content: >
+      A refund request can be submitted up to thirty days after purchase.
+
+  - key: alpha_refund_old_policy_001
+    source_key: note_alpha_release
+    semantic_label: superseded_refund_policy
+    content: >
+      An older policy allowed refund requests within fourteen days.
+    metadata:
+      status: superseded
+
+  - key: alpha_release_schedule_001
+    source_key: note_alpha_release
+    semantic_label: release_schedule
+    content: >
+      Production releases are normally scheduled for Tuesday mornings.
+
+  - key: alpha_support_hours_001
+    source_key: note_alpha_release
+    semantic_label: office_hours
+    content: >
+      Support operates from nine in the morning until five in the afternoon.
+
+  - key: alpha_password_rules_001
+    source_key: doc_alpha_policy
+    semantic_label: password_rules
+    content: >
+      Passwords must contain at least twelve characters.
+
+  - key: alpha_context_a_001
+    source_key: doc_alpha_context_a
+    semantic_label: context_budget_fixture
+    content: >
+      Synthetic context segment A repeats the safe verification code ORCHID.
+    content_repeat: 44
+
+  - key: alpha_context_a_002
+    source_key: doc_alpha_context_a
+    semantic_label: context_budget_fixture
+    content: >
+      Synthetic context segment B repeats the safe verification code ORCHID.
+    content_repeat: 44
+
+  - key: alpha_context_a_003
+    source_key: doc_alpha_context_a
+    semantic_label: context_budget_fixture
+    content: >
+      Synthetic context segment C repeats the safe verification code ORCHID.
+    content_repeat: 44
+
+  - key: alpha_context_b_001
+    source_key: note_alpha_context_b
+    semantic_label: context_budget_fixture
+    content: >
+      Synthetic context segment D repeats the safe verification code ORCHID.
+    content_repeat: 44
+
+  - key: alpha_context_b_002
+    source_key: note_alpha_context_b
+    semantic_label: context_budget_fixture
+    content: >
+      Synthetic context segment E repeats the safe verification code ORCHID.
+    content_repeat: 44
+
+  - key: alpha_context_b_003
+    source_key: note_alpha_context_b
+    semantic_label: context_budget_fixture
+    content: >
+      Synthetic context segment F repeats the safe verification code ORCHID.
+    content_repeat: 44
+
+  - key: beta_security_rotation_001
+    source_key: memo_beta_security
+    semantic_label: credential_rotation
+    content: >
+      Service credentials should be rotated every ninety days.
+
+  - key: beta_provider_boundary_001
+    source_key: memo_beta_security
+    semantic_label: access_rotation_policy
+    content: >
+      Access credentials used by internal integrations are reviewed periodically
+      and replaced according to the security schedule.
+
+  - key: bob_private_refund_001
+    source_key: doc_bob_private
+    semantic_label: refund_policy
+    content: >
+      This unrelated private workspace also discusses refund procedures.
+
+  - key: bob_private_security_001
+    source_key: doc_bob_private
+    semantic_label: cobalt_security_review
+    content: >
+      The private security review is performed every forty-seven days.
+
+questions:
+  # Direct semantic match
+  - key: direct_refund_period
+    user_key: user_alice
+    workspace_key: workspace_alpha
+    question: What is the refund period?
+    semantic_label: refund_policy
+    expected_chunk_keys:
+      - alpha_policy_refund_001
+    forbidden_chunk_keys:
+      - beta_security_rotation_001
+      - bob_private_refund_001
+    expect_abstention: false
+    expected_match: all
+    tags:
+      - direct_match
+
+  # Paraphrase
+  - key: paraphrase_refund_period
+    user_key: user_alice
+    workspace_key: workspace_alpha
+    question: How long after buying something can a customer get their money back?
+    semantic_label: refund_policy
+    expected_chunk_keys:
+      - alpha_policy_refund_001
+    forbidden_chunk_keys:
+      - bob_private_refund_001
+    expect_abstention: false
+    expected_match: all
+    tags:
+      - paraphrase
+
+  # Multiple supporting sources
+  - key: refund_process_multiple_sources
+    user_key: user_alice
+    workspace_key: workspace_alpha
+    question: Explain both refund eligibility and how an approved refund is returned.
+    semantic_label: refund_policy
+    expected_chunk_keys:
+      - alpha_policy_refund_001
+      - alpha_refund_method_001
+    forbidden_chunk_keys:
+      - bob_private_refund_001
+    expect_abstention: false
+    expected_match: all
+    tags:
+      - multiple_sources
+
+  # Near duplicate chunks
+  - key: refund_near_duplicate
+    user_key: user_alice
+    workspace_key: workspace_alpha
+    question: When is the deadline for asking for a refund?
+    semantic_label: refund_policy
+    expected_chunk_keys:
+      - alpha_policy_refund_001
+      - alpha_refund_duplicate_001
+    forbidden_chunk_keys: []
+    expect_abstention: false
+    expected_match: any
+    tags:
+      - near_duplicate
+
+  # Contradictory / superseded evidence
+  - key: refund_contradiction
+    user_key: user_alice
+    workspace_key: workspace_alpha
+    question: What is the current refund request period?
+    semantic_label: refund_policy
+    expected_chunk_keys:
+      - alpha_policy_refund_001
+    forbidden_chunk_keys:
+      - alpha_refund_old_policy_001
+    expect_abstention: false
+    expected_match: all
+    tags:
+      - contradiction
+
+  # Distractor behavior
+  - key: refund_with_distractors
+    user_key: user_alice
+    workspace_key: workspace_alpha
+    question: How many days do I have to request a refund?
+    semantic_label: refund_policy
+    expected_chunk_keys:
+      - alpha_policy_refund_001
+    forbidden_chunk_keys: []
+    expect_abstention: false
+    expected_match: all
+    tags:
+      - distractors
+
+  # Readable repeated content that deterministically crosses the context budget.
+  # Three chunks per source remain within the retriever's per-source cap.
+  - key: long_context_budget
+    user_key: user_alice
+    workspace_key: workspace_alpha
+    question: What verification code appears throughout the synthetic context segments?
+    semantic_label: context_budget_fixture
+    expected_chunk_keys:
+      - alpha_context_a_001
+      - alpha_context_a_002
+      - alpha_context_a_003
+      - alpha_context_b_001
+      - alpha_context_b_002
+      - alpha_context_b_003
+    forbidden_chunk_keys: []
+    expect_abstention: false
+    expected_match: any
+    tags:
+      - long_context
+      - context_budget
+
+  # Same user, wrong workspace: strong canary
+  - key: cross_workspace_canary
+    user_key: user_alice
+    workspace_key: workspace_alpha
+    question: How frequently are service credentials rotated?
+    semantic_label: credential_rotation
+    expected_chunk_keys: []
+    forbidden_chunk_keys:
+      - beta_security_rotation_001
+      - beta_provider_boundary_001
+    expect_abstention: true
+    tags:
+      - cross_workspace
+      - canary
+
+  # Wrong user: strong canary
+  - key: cross_user_canary
+    user_key: user_alice
+    workspace_key: workspace_alpha
+    question: How often is the private security review performed?
+    semantic_label: cobalt_security_review
+    expected_chunk_keys: []
+    forbidden_chunk_keys:
+      - bob_private_security_001
+    expect_abstention: true
+    tags:
+      - cross_user
+      - canary
+
+  # Unanswerable
+  - key: unanswerable_vacation_policy
+    user_key: user_alice
+    workspace_key: workspace_alpha
+    question: How many paid vacation days does the company provide?
+    semantic_label: vacation_policy
+    expected_chunk_keys: []
+    forbidden_chunk_keys: []
+    expect_abstention: true
+    tags:
+      - unanswerable
+
+  # Just inside the configured distance threshold
+  - key: distance_boundary_inside
+    user_key: user_alice
+    workspace_key: workspace_alpha
+    question: What is the deadline for asking to be reimbursed?
+    semantic_label: boundary_refund_query_inside
+    expected_chunk_keys:
+      - alpha_policy_refund_001
+    forbidden_chunk_keys: []
+    expect_abstention: false
+    expected_match: all
+    retrieval_expectation:
+      type: distance_boundary
+      target_chunk_key: alpha_policy_refund_001
+      threshold: 0.55
+      deterministic_distance: 0.54
+      comparison: less_than_or_equal
+    tags:
+      - distance_boundary
+
+  # Exactly on the configured threshold
+  - key: distance_boundary_exact
+    user_key: user_alice
+    workspace_key: workspace_alpha
+    question: What is the refund deadline at the configured retrieval boundary?
+    semantic_label: boundary_refund_query_exact
+    expected_chunk_keys:
+      - alpha_policy_refund_001
+    forbidden_chunk_keys: []
+    expect_abstention: false
+    expected_match: all
+    retrieval_expectation:
+      type: distance_boundary
+      target_chunk_key: alpha_policy_refund_001
+      threshold: 0.55
+      deterministic_distance: 0.55
+      comparison: less_than_or_equal
+    tags:
+      - distance_boundary
+      - exact_threshold
+
+  # Just outside the configured distance threshold
+  - key: distance_boundary_outside
+    user_key: user_alice
+    workspace_key: workspace_alpha
+    question: Tell me about reimbursement eligibility.
+    semantic_label: boundary_refund_query_outside
+    expected_chunk_keys: []
+    forbidden_chunk_keys: []
+    expect_abstention: true
+    retrieval_expectation:
+      type: distance_boundary
+      target_chunk_key: alpha_policy_refund_001
+      threshold: 0.55
+      deterministic_distance: 0.56
+      comparison: less_than_or_equal
+    tags:
+      - distance_boundary
+
+  # Sanitized regression case resembling a provider-threshold issue.
+  # Relevant evidence exists, but provider embeddings may place it above 0.55.
+  - key: provider_threshold_regression
+    user_key: user_alice
+    workspace_key: workspace_beta
+    question: When should integration access credentials be replaced?
+    semantic_label: access_rotation_policy
+    expected_chunk_keys:
+      - beta_provider_boundary_001
+    forbidden_chunk_keys: []
+    expect_abstention: false
+    expected_match: all
+    retrieval_expectation:
+      type: provider_threshold_sensitive
+      target_chunk_key: beta_provider_boundary_001
+      configured_distance_threshold: 0.55
+      deterministic:
+        should_retrieve: true
+        distance: 0.52
+      provider:
+        expected_behavior: may_exceed_threshold
+        regression_note: >
+          Relevant evidence is intentionally phrased differently enough that
+          provider-generated embeddings may place it near or above the current
+          retrieval distance threshold.
+    tags:
+      - paraphrase
+      - provider_boundary
+      - regression

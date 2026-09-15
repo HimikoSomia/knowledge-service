@@ -65,12 +65,17 @@ Each case should provide:
 - A stable case identifier and descriptive tags.
 - The user and workspace from which the question is asked.
 - The question text.
-- One or more expected source keys when the case is answerable.
-- Forbidden source keys, including ownership-isolation canaries.
+- One or more expected chunk keys when the case is answerable.
+- Forbidden chunk keys, including ownership-isolation canaries.
 - Whether abstention is expected.
 - Optional expected facts for a later answer-generation review.
 
-Dataset validation must reject duplicate keys, missing references, empty questions, answerable cases without expected sources, and a forbidden source that is also expected.
+Distance-sensitive cases must identify the target chunk used to construct the declared deterministic distance, including cases where that distance should produce abstention.
+Declared deterministic cosine distances must be finite numbers between `0` and `2`, inclusive.
+
+Long-context chunks may declare a positive integer `content_repeat`. Evaluation loaders expand the readable content template before insertion; this keeps the source-controlled dataset reviewable while still exercising the configured context budget.
+
+Dataset validation must reject duplicate keys, missing references, empty questions, answerable cases without expected chunks, and a forbidden chunk that is also expected.
 
 ## Evaluation modes
 
@@ -114,16 +119,16 @@ Exact pgvector search remains the reference result set. Approximate indexes must
 
 Required retrieval metrics:
 
-- **Hit rate at 8:** percentage of answerable cases with at least one expected source in the final eight contexts.
-- **Recall at 8:** percentage of all expected sources present in the final contexts.
-- **Mean reciprocal rank:** how early the first expected source appears.
-- **Forbidden-hit count:** any cross-user, cross-workspace, or explicitly forbidden source returned at either candidate or final-context level.
+- **Hit rate at 8:** percentage of answerable cases with at least one expected chunk in the final eight contexts.
+- **Recall at 8:** percentage of all expected chunks present in the final contexts.
+- **Mean reciprocal rank:** how early the first expected chunk appears.
+- **Forbidden-hit count:** any cross-user, cross-workspace, or explicitly forbidden chunk returned at either candidate or final-context level.
 - **Abstention accuracy:** percentage of unanswerable cases that produce no accepted context.
 - **Context utilization:** result count, source diversity, and characters used from the configured context budget.
 - **Filter-loss reasons:** counts rejected by distance, per-source cap, blank content, result limit, and context budget.
 - **Latency:** p50, p95, maximum, and sample count, reported separately for candidate search and final filtering where practical.
 
-The evaluator should emit both machine-readable JSON and a concise Markdown summary. Failed cases must identify source keys and ranks, but reports must not include credentials or unnecessary full source content.
+The evaluator should emit both machine-readable JSON and a concise Markdown summary. Failed cases must identify chunk keys and ranks, but reports must not include credentials or unnecessary full chunk content.
 
 ## Provisional baseline gates
 
@@ -195,4 +200,3 @@ Use the evidence to choose the next phase:
 | Exact retrieval misses the hardware-qualified latency target | Compare HNSW with the exact baseline and measure recall loss. |
 | Results are acceptable and code knowledge is valuable | Plan a provider-specific Git MVP with repository entries and incremental synchronization. |
 | Project-state questions provide more value than code questions | Plan the selected project-system connector separately from Git. |
-
