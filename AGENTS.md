@@ -282,3 +282,18 @@ For review, lead with findings ordered by severity and include file/line referen
 - Missing or weak tests.
 
 If no findings exist, say so and identify meaningful test or runtime coverage gaps. Final responses must state what changed, what was verified, and any remaining manual step without overstating completeness.
+
+## GitHub Issue Creation And Maintenance
+
+When converting development checkpoints into GitHub issues:
+
+- Create, update, or close an issue only when the user explicitly requests that GitHub mutation. A request to review, plan, or draft work does not authorize publishing it; prepare the issue text locally instead.
+- Search the repository for existing or overlapping issues before creating one. Prefer updating an appropriate tracker over creating a duplicate.
+- Use the current implementation, accepted repository documentation and decisions, and existing GitHub history as evidence. If they conflict in a way that materially affects behavior or scope, identify the conflict and ask for direction rather than silently choosing one.
+- Do not invent additional product requirements. Preserve important constraints, dependencies, blockers, and out-of-scope decisions so another agent can continue without relying on previous chat history.
+- Prefer cohesive issues over one issue per checklist item. Include the goal, scope, relevant repository references, current implementation status, dependencies, and verification requirements.
+- Separate acceptance criteria from implementation tasks. Acceptance criteria describe observable outcomes; checklists describe the work expected to produce those outcomes.
+- Mark a checklist item complete only after its required verification passes. Record the exact tests or checks run, their observed results, and anything that remains unverified.
+- Keep architectural decisions in repository documentation and use GitHub issues to track execution status. Update both when implementation changes make either one inaccurate.
+- Close a tracking issue only after all final acceptance criteria are satisfied. Otherwise leave it open and record the remaining work or concrete blocker.
+- After any GitHub mutation, report the issue URL and summarize exactly what was created or changed.
