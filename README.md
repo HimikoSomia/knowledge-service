@@ -2,7 +2,31 @@
 
 Knowledge Service is a Rails application for organizing user-owned workspaces, uploaded documents, notes, and memos. It turns workspace content into searchable chunks, optionally enriches document images with OpenAI Vision, generates OpenAI embeddings, and provides workspace-scoped semantic search and grounded answers.
 
-The current deliverable is a standalone application. Its directional productization target is a configurable Rails Engine gem, with this repository retained as the reference host; that extraction is not yet implemented or scheduled. See [Long-Term Productization Target](docs/productization-target.md).
+The current deliverable is a standalone Rails application. Its next directional productization milestone is a configurable Rails Engine gem, with this repository retained as the reference host. The longer-term direction is to make the stable RAG domain logic usable without Rails while keeping Rails as a supported integration. This work is not yet implemented or scheduled. See [Long-Term Productization Target](docs/productization-target.md).
+
+## Project direction
+
+The immediate productization target is a configurable Rails Engine extracted from the current application. The longer-term direction is to make the stable RAG domain logic usable without Rails.
+
+In that model:
+
+- A framework-independent Ruby core owns reusable ingestion, chunking, retrieval, and answer-generation behavior.
+- Rails is supported through an optional integration layer, potentially packaged as a Rails Engine.
+- A standalone server can expose the same core capabilities without requiring a Rails application.
+- This repository remains the reference application and integration test bed.
+- Persistence, job, storage, and provider boundaries are extracted only after real implementations demonstrate the required contracts.
+
+The Rails Engine is therefore an incremental productization milestone and a supported integration option, not necessarily the final architectural boundary. This direction should be pursued gradually from stable, tested application behavior rather than through a large rewrite or speculative abstractions.
+
+### Expected evolution
+
+1. Stabilize and evaluate the current Rails implementation.
+2. Add at least one external knowledge-source integration.
+3. Document proven domain and host contracts.
+4. Extract a configurable Rails Engine while preserving the reference application.
+5. Separate reusable domain logic from Rails-specific integration.
+6. Provide a supported standalone server or API host.
+7. Add other adapters and integrations when concrete requirements justify them.
 
 ## Features
 
