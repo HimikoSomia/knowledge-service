@@ -283,17 +283,22 @@ For review, lead with findings ordered by severity and include file/line referen
 
 If no findings exist, say so and identify meaningful test or runtime coverage gaps. Final responses must state what changed, what was verified, and any remaining manual step without overstating completeness.
 
-## GitHub Issue Creation And Maintenance
+## GitHub Issues And Project Board
 
-When converting development checkpoints into GitHub issues:
+The canonical execution board is the user-owned [Knowledge Service project](https://github.com/users/HimikoSomia/projects/4), project number `4`. Repository issues remain the durable record for implementation work; the project board organizes their execution state.
 
-- Create, update, or close an issue only when the user explicitly requests that GitHub mutation. A request to review, plan, or draft work does not authorize publishing it; prepare the issue text locally instead.
-- Search the repository for existing or overlapping issues before creating one. Prefer updating an appropriate tracker over creating a duplicate.
+When converting or tracking development checkpoints:
+
+- Create, update, close, add, remove, or move an issue or project item only when the user explicitly requests the corresponding GitHub mutation. A request to review, plan, or draft work does not authorize publishing it; prepare the content locally instead.
+- Before creating work, search both repository issues and the Knowledge Service project for existing or overlapping items. Prefer updating an appropriate tracker over creating a duplicate issue or board item.
+- Use repository issues for work that changes this codebase. Use draft project items only when the user explicitly requests a board-only task or the work does not yet belong in a repository issue.
+- When an authorized repository issue belongs to current product work, add it to project `4` unless the user says not to. Do not add the same issue more than once.
 - Use the current implementation, accepted repository documentation and decisions, and existing GitHub history as evidence. If they conflict in a way that materially affects behavior or scope, identify the conflict and ask for direction rather than silently choosing one.
 - Do not invent additional product requirements. Preserve important constraints, dependencies, blockers, and out-of-scope decisions so another agent can continue without relying on previous chat history.
 - Prefer cohesive issues over one issue per checklist item. Include the goal, scope, relevant repository references, current implementation status, dependencies, and verification requirements.
 - Separate acceptance criteria from implementation tasks. Acceptance criteria describe observable outcomes; checklists describe the work expected to produce those outcomes.
 - Mark a checklist item complete only after its required verification passes. Record the exact tests or checks run, their observed results, and anything that remains unverified.
-- Keep architectural decisions in repository documentation and use GitHub issues to track execution status. Update both when implementation changes make either one inaccurate.
-- Close a tracking issue only after all final acceptance criteria are satisfied. Otherwise leave it open and record the remaining work or concrete blocker.
-- After any GitHub mutation, report the issue URL and summarize exactly what was created or changed.
+- Use only the board's existing `Status` values: `Todo`, `In Progress`, and `Done`. New or queued work starts as `Todo`; move it to `In Progress` only when implementation is actively underway; move it to `Done` only after acceptance criteria and required verification pass. Record blockers on the issue rather than inventing an unsupported board status.
+- Keep issue state and board state synchronized. Closing an issue requires satisfied acceptance criteria and should correspond to `Done`; incomplete or blocked work remains open and must not be marked `Done`.
+- Keep architectural decisions in repository documentation, implementation detail and verification history in issues, and execution state on the project board. Update each affected surface when implementation makes it inaccurate.
+- After any GitHub mutation, report the issue URL, project item or status change, and exactly what was created or updated.
